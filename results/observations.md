@@ -22,6 +22,13 @@ These observations align the benchmark results with the project goal: comparing 
    - Signing/verification times scale roughly linearly with transaction count, which is expected.
    - The graphs reinforce which scheme scales best for high‑throughput blockchain workloads.
 
+## Which Is Better (and Why)
+- **Best overall for blockchains:** **ECDSA (secp256k1)**
+  - Smaller keys/signatures → less storage + bandwidth.
+  - Faster verification in practice at scale → better throughput.
+- **RSA‑2048:** acceptable if you need RSA interoperability, but it costs more space.
+- **RSA‑3072:** strongest of the RSA options here, but it’s the slowest + largest, so it’s the least practical for high‑volume chains.
+
 ## Why This Fits a Blockchain Use‑Case
 - Blockchains need **fast verification**, **small signatures**, and **low bandwidth use**.
 - The benchmark confirms why **ECDSA (secp256k1)** is standard in many blockchain systems (e.g., Bitcoin/Ethereum): strong security with compact keys and signatures.
