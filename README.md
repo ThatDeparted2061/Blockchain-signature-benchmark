@@ -1,4 +1,4 @@
-# blockchain-signature-benchmark
+# Blockchain-signature-benchmark
 
 A performance comparison between RSA (2048, 3072) and ECDSA (secp256k1) for signing and verifying simulated blockchain transactions.
 
