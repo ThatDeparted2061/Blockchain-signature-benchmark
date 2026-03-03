@@ -132,13 +132,14 @@ def benchmark_rsa(key_size, security_bits):
         
         for _ in range(iterations):
             start = time.perf_counter()
+            # Use PSS for signing (probabilistic padding)
             sig = private_key.sign(
                 TEST_MESSAGE,
-                padding.OAEP(
+                padding.PSS(
                     mgf=padding.MGF1(hashes.SHA256()),
-                    algorithm=hashes.SHA256(),
-                    label=None
-                )
+                    salt_length=padding.PSS.MAX_LENGTH
+                ),
+                hashes.SHA256()
             )
             sign_times.append(time.perf_counter() - start)
             signatures.append(sig)
@@ -153,11 +154,11 @@ def benchmark_rsa(key_size, security_bits):
             public_key.verify(
                 sig,
                 TEST_MESSAGE,
-                padding.OAEP(
+                padding.PSS(
                     mgf=padding.MGF1(hashes.SHA256()),
-                    algorithm=hashes.SHA256(),
-                    label=None
-                )
+                    salt_length=padding.PSS.MAX_LENGTH
+                ),
+                hashes.SHA256()
             )
             verify_times.append(time.perf_counter() - start)
         
