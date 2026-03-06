@@ -11,6 +11,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Debug after checkout
+        run: echo "GIT FETCHED $(git rev-parse --abbrev-ref HEAD)"
 
       - name: Set up Python
         uses: actions/setup-python@v4
