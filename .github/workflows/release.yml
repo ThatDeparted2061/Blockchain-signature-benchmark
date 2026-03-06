@@ -46,20 +46,23 @@ jobs:
           Please review the CSV for detailed numbers. If you need a full run for the largest RSA sizes, re-run locally on a larger machine.
           EOF
 
-      - name: Create GitHub release
-        id: create_release
-        uses: actions/create-release@v1
-        with:
-          tag_name: v${{ github.run_number }}-${{ github.sha }}
-          release_name: Release ${{ github.run_number }}
-          draft: false
-          prerelease: false
+      - name: Create and push tag
+        id: create_tag
+        run: |
+          TAG="v${{ github.run_number }}-${{ github.sha }}"
+          echo "Creating tag $TAG"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "CI release $TAG"
+          git push origin "$TAG"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload release assets
+      - name: Create GitHub release and upload assets
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: v${{ github.run_number }}-${{ github.sha }}
+          name: Release ${{ github.run_number }}
           files: |
             results/benchmark_results_comprehensive.csv
             results/*.png
