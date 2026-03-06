@@ -1,6 +1,6 @@
 # Blockchain-signature-benchmark
 
-A performance comparison between RSA (2048, 3072) and ECDSA (secp256k1) for signing and verifying simulated blockchain transactions.
+A performance comparison between RSA and ECDSA digital signature algorithms across equivalent security levels.
 
 ## Setup
 
@@ -12,41 +12,47 @@ pip install -r requirements.txt
 
 ## Run the benchmark
 
+The new comprehensive benchmark script compares RSA (PSS) and ECDSA across mapped security levels and emits CSV results.
+
 ```bash
-python main.py
+# run full benchmark (may be slow for large RSA keys)
+python ecdsa_vs_rsa_benchmark.py --warmup 1 --iters 3 --max-rsa 3072 --out results/benchmark_results_comprehensive.csv
+
+# run smoke test (quick, good for CI)
+python ecdsa_vs_rsa_benchmark.py --warmup 1 --iters 1 --max-rsa 2048 --out results/benchmark_results_comprehensive.csv
 ```
 
-Live progress will print to the console as each scheme/transaction count completes.
+## Generate graphs
+
+After running the benchmark, generate graphs from the CSV output (saved to `results/` by default):
+
+```bash
+python results/plot_results.py --csv results/benchmark_results_comprehensive.csv --outdir results
+```
+
+This will produce PNG graphs in the results directory:
+
+- signing_time.png
+- verification_time.png
+- key_sizes.png
+- signature_sizes.png
+- signing_cpu_time.png
 
 ## Metrics Explained
 
-- **signing_total_s / signing_avg_ms**: Total and average time to sign all transactions.
-- **verification_total_s / verification_avg_ms**: Total and average time to verify all signatures.
-- **cpu_time_s**: CPU process time consumed for sign + verify.
-- **memory_max_mb**: Peak memory observed during the run.
-- **signature_size_bytes**: Size of a signature in bytes.
-- **public_key_size_bytes**: Size of the public key in bytes.
-
-## Example Output (CSV)
-
-```
-scheme,transactions,signing_total_s,signing_avg_ms,verification_total_s,verification_avg_ms,cpu_time_s,memory_max_mb,signature_size_bytes,public_key_size_bytes
-RSA-2048,1000,1.23,1.23,0.88,0.88,2.11,145.2,256,294
-```
-
-## Graphs
-
-Graphs are saved in `results/graphs/`:
-
-- Signing time vs transactions
-- Verification time vs transactions
-- Signature size comparison
-- Key size comparison
-- CPU usage comparison
-- Memory usage comparison
+- rsa_key_size / ecdsa_curve: Key parameters used for the experiment.
+- *_keygen_wall_ms / *_keygen_cpu_ms: Time to generate keys (wall and CPU time).
+- *_sign_wall_ms_median / *_verify_wall_ms_median: Median wall time (ms) for sign/verify operations across measured iterations.
+- *_sign_cpu_ms_median / *_verify_cpu_ms_median: Median CPU time (ms) for sign/verify operations.
+- *_signature_size: Signature size in bytes.
+- *_peak_rss_kb: Peak RSS memory used (kilobytes) measured during operation.
 
 ## Notes
 
-- Keys are generated once per scheme per experiment (not per transaction).
-- Transactions include sender, receiver, amount, timestamp, and transaction ID.
-- Transaction ID is the SHA256 hash of the serialized transaction.
+- RSA signing uses RSASSA-PSS (padding.PSS with SHA-256) — OAEP is for encryption and not used for signatures.
+- Large RSA keys (>= 7680 bits) are slow to generate; use `--max-rsa` to limit experiments for faster runs.
+- The scripts are intended to be run on a machine with sufficient CPU for high-key benchmarks. For long-running benchmarks, run on a dedicated server or CI with more CPU cores.
+
+## Commit & Branch
+
+The benchmarking additions (comprehensive benchmark and plotting) are on branch `copilot/benchmark-updates`. They will be merged to `main` on request.
