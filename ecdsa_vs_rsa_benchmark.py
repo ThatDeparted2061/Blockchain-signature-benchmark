@@ -3,7 +3,7 @@ import csv
 import argparse
 import resource
 from cryptography.hazmat.primitives.asymmetric import rsa, ec, padding
-from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.backends import default_backend
 
 security_levels = [
@@ -73,7 +73,9 @@ def rsa_generate_sign_verify(rsa_key_size, message):
         hashes.SHA256()
     )
 
-    return priv_key, pub_key, signature
+    pub_der = pub_key.public_bytes(encoding=serialization.Encoding.DER, format=serialization.PublicFormat.SubjectPublicKeyInfo)
+    pub_size = len(pub_der)
+    return priv_key, pub_key, signature, pub_size
 
 
 def ecdsa_generate_sign_verify(curve, message):
@@ -81,13 +83,15 @@ def ecdsa_generate_sign_verify(curve, message):
     pub_key = priv_key.public_key()
     signature = priv_key.sign(message, ec.ECDSA(hashes.SHA256()))
     pub_key.verify(signature, message, ec.ECDSA(hashes.SHA256()))
-    return priv_key, pub_key, signature
+    pub_der = pub_key.public_bytes(encoding=serialization.Encoding.DER, format=serialization.PublicFormat.SubjectPublicKeyInfo)
+    pub_size = len(pub_der)
+    return priv_key, pub_key, signature, pub_size
 
 
 def benchmark_rsa(rsa_key_size, message, warmups=1, iterations=3):
     # keygen measurement
     wall_k, cpu_k, peak_k, priv_pub_sig = measure_memory_cpu(lambda: rsa_generate_sign_verify(rsa_key_size, message))
-    priv_key, pub_key, signature_example = priv_pub_sig
+    priv_key, pub_key, signature_example, pub_size = priv_pub_sig
     sig_len = len(signature_example)
     pub_bytes = pub_key.public_bytes
 
@@ -114,13 +118,14 @@ def benchmark_rsa(rsa_key_size, message, warmups=1, iterations=3):
         'verify_wall_ms_median': round(median(verify_ws), 3),
         'verify_cpu_ms_median': round(median(verify_cps), 3),
         'signature_size_bytes': sig_len,
+        'public_key_size_bytes': pub_size,
         'peak_rss_kb': peak_k
     }
 
 
 def benchmark_ecdsa(curve, message, warmups=1, iterations=3):
     wall_k, cpu_k, peak_k, priv_pub_sig = measure_memory_cpu(lambda: ecdsa_generate_sign_verify(curve, message))
-    priv_key, pub_key, signature_example = priv_pub_sig
+    priv_key, pub_key, signature_example, pub_size = priv_pub_sig
     sig_len = len(signature_example)
 
     for _ in range(warmups):
@@ -145,6 +150,7 @@ def benchmark_ecdsa(curve, message, warmups=1, iterations=3):
         'verify_wall_ms_median': round(median(verify_ws), 3),
         'verify_cpu_ms_median': round(median(verify_cps), 3),
         'signature_size_bytes': sig_len,
+        'public_key_size_bytes': pub_size,
         'peak_rss_kb': peak_k
     }
 
