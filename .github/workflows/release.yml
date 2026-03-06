@@ -27,7 +27,7 @@ jobs:
         run: |
           mkdir -p results
           # Run full benchmark but cap at 3072 by default to avoid extremely long runs on GH runners
-          python ecdsa_vs_rsa_benchmark.py --warmup 1 --iters 3 --max-rsa 3072 --out results/benchmark_results_comprehensive.csv
+          python ecdsa_vs_rsa_benchmark.py --warmup 1 --iters 3  --out results/benchmark_results_comprehensive.csv
 
       - name: Generate plots
         run: |
