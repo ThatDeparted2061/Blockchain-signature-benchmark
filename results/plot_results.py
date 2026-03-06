@@ -58,9 +58,11 @@ def main():
     ecdsa_verify = [to_float(r['ecdsa_verify_wall_ms_median']) for r in rows]
     plot_bar(labels, rsa_verify, ecdsa_verify, 'Verification Time (ms) by Security Level', 'Verification time (ms)', os.path.join(args.outdir, 'verification_time.png'))
 
-    # Key size (bits)
-    rsa_key_sizes = [to_float(r['rsa_key_size']) for r in rows]
-    ecdsa_key_sizes = rsa_key_sizes  # for plotting symmetry, labels suffice
+    # Key size (bits) and public key size (bytes)
+    rsa_key_sizes = [to_float(r.get('rsa_key_size')) for r in rows]
+    rsa_pub_sizes = [to_float(r.get('rsa_public_key_size')) for r in rows]
+    ecdsa_pub_sizes = [to_float(r.get('ecdsa_public_key_size')) for r in rows]
+
     plt.figure(figsize=(10,6))
     plt.bar(labels, rsa_key_sizes, label='RSA key size (bits)')
     plt.ylabel('Key size (bits)')
@@ -68,6 +70,9 @@ def main():
     plt.tight_layout()
     plt.savefig(os.path.join(args.outdir, 'key_sizes.png'))
     plt.close()
+
+    # Public key sizes (bytes)
+    plot_bar(labels, rsa_pub_sizes, ecdsa_pub_sizes, 'Public Key Size (bytes) by Security Level', 'Public key size (bytes)', os.path.join(args.outdir, 'public_key_sizes.png'))
 
     # Signature size
     rsa_sig = [to_float(r['rsa_signature_size']) for r in rows]
