@@ -3,6 +3,7 @@ name: Build & Release Benchmark Results
 on:
   push:
     branches:
+      # Run on every push to publish updated benchmark artifacts (per task requirement).
       - "**"
 
 jobs:

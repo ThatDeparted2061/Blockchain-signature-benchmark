@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 import argparse
 
 VERIFICATION_COUNTS = [5000, 10000, 15000, 20000, 30000]
-SPEED_COUNT = 25000
+REFERENCE_COUNT = 25000
+EPSILON = 1e-9
 
 
 def read_csv(path):
@@ -39,6 +40,8 @@ def plot_bar(x_labels, rsa_vals, ecdsa_vals, title, ylabel, out_path):
 
 
 def plot_lines(x_vals, rsa_vals, ecdsa_vals, title, ylabel, out_path):
+    if any(val is None for val in rsa_vals + ecdsa_vals):
+        return
     plt.figure(figsize=(10, 6))
     plt.plot(x_vals, rsa_vals, marker='o', label='RSA')
     plt.plot(x_vals, ecdsa_vals, marker='o', label='ECDSA')
@@ -51,16 +54,19 @@ def plot_lines(x_vals, rsa_vals, ecdsa_vals, title, ylabel, out_path):
     plt.close()
 
 
-def total_seconds(median_ms, count):
+def calculate_total_verification_seconds(median_ms, count):
     if median_ms is None:
         return None
     return (median_ms / 1000.0) * count
 
 
-def verification_speed(median_ms):
+def calculate_verifications_per_second(median_ms, count):
     if median_ms is None or median_ms == 0:
         return None
-    return 1000.0 / median_ms
+    total_time = calculate_total_verification_seconds(median_ms, count)
+    if total_time == 0:
+        return None
+    return count / total_time
 
 
 def main():
@@ -76,7 +82,7 @@ def main():
         print('No rows found in', args.csv)
         return
 
-    labels = [r['security_bits'] for r in rows]
+    labels = [r.get('security_label') or r['security_bits'] for r in rows]
 
     # Signing time (wall)
     rsa_sign = [to_float(r['rsa_sign_wall_ms_median']) for r in rows]
@@ -122,8 +128,8 @@ def main():
         rsa_verify_cpu = to_float(row['rsa_verify_cpu_ms_median'])
         ecdsa_verify_cpu = to_float(row['ecdsa_verify_cpu_ms_median'])
 
-        rsa_verify_totals = [total_seconds(rsa_verify_wall, count) for count in VERIFICATION_COUNTS]
-        ecdsa_verify_totals = [total_seconds(ecdsa_verify_wall, count) for count in VERIFICATION_COUNTS]
+        rsa_verify_totals = [calculate_total_verification_seconds(rsa_verify_wall, count) for count in VERIFICATION_COUNTS]
+        ecdsa_verify_totals = [calculate_total_verification_seconds(ecdsa_verify_wall, count) for count in VERIFICATION_COUNTS]
         plot_lines(
             VERIFICATION_COUNTS,
             rsa_verify_totals,
@@ -133,8 +139,8 @@ def main():
             os.path.join(args.outdir, f"verification_time_{security_bits}bit.png"),
         )
 
-        rsa_verify_cpu_totals = [total_seconds(rsa_verify_cpu, count) for count in VERIFICATION_COUNTS]
-        ecdsa_verify_cpu_totals = [total_seconds(ecdsa_verify_cpu, count) for count in VERIFICATION_COUNTS]
+        rsa_verify_cpu_totals = [calculate_total_verification_seconds(rsa_verify_cpu, count) for count in VERIFICATION_COUNTS]
+        ecdsa_verify_cpu_totals = [calculate_total_verification_seconds(ecdsa_verify_cpu, count) for count in VERIFICATION_COUNTS]
         plot_lines(
             VERIFICATION_COUNTS,
             rsa_verify_cpu_totals,
@@ -145,15 +151,15 @@ def main():
         )
 
     # Verification speed comparison for 25k verifications across security levels
-    rsa_speed_25k = [verification_speed(to_float(r['rsa_verify_wall_ms_median'])) for r in rows]
-    ecdsa_speed_25k = [verification_speed(to_float(r['ecdsa_verify_wall_ms_median'])) for r in rows]
+    rsa_speed_25k = [calculate_verifications_per_second(to_float(r['rsa_verify_wall_ms_median']), REFERENCE_COUNT) for r in rows]
+    ecdsa_speed_25k = [calculate_verifications_per_second(to_float(r['ecdsa_verify_wall_ms_median']), REFERENCE_COUNT) for r in rows]
     ratio_labels = []
-    for security_bits, rsa_speed, ecdsa_speed in zip(labels, rsa_speed_25k, ecdsa_speed_25k):
-        if rsa_speed is None or ecdsa_speed is None:
+    for security_label, rsa_speed, ecdsa_speed in zip(labels, rsa_speed_25k, ecdsa_speed_25k):
+        if rsa_speed is None or ecdsa_speed is None or ecdsa_speed <= EPSILON:
             ratio_label = "R/E N/A"
         else:
             ratio_label = f"R/E {rsa_speed / ecdsa_speed:.2f}x"
-        ratio_labels.append(f"{security_bits}\n{ratio_label}")
+        ratio_labels.append(f"{security_label}\n{ratio_label}")
     plt.figure(figsize=(10, 7))
     x = range(len(labels))
     width = 0.35
@@ -161,10 +167,10 @@ def main():
     plt.bar([i + width / 2 for i in x], ecdsa_speed_25k, width=width, label='ECDSA')
     plt.xticks(x, ratio_labels)
     plt.ylabel("Verifications per second")
-    plt.title(f"Verification Speed for {SPEED_COUNT} Verifications by Security Level")
+    plt.title(f"Verification Speed for {REFERENCE_COUNT} Verifications (verifications/sec) by Security Level")
     plt.legend()
     plt.tight_layout()
-    plt.savefig(os.path.join(args.outdir, f"verification_speed_{SPEED_COUNT}.png"))
+    plt.savefig(os.path.join(args.outdir, f"verification_speed_{REFERENCE_COUNT}.png"))
     plt.close()
 
     print('Saved graphs to', args.outdir)

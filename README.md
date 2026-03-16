@@ -54,6 +54,7 @@ This will produce PNG graphs in the results directory:
 
 - RSA signing uses RSASSA-PSS (padding.PSS with SHA-256) — OAEP is for encryption and not used for signatures.
 - Large RSA keys (>= 7680 bits) are slow to generate; use `--max-rsa` to limit experiments for faster runs.
+- The 512-bit row pairs RSA-30720 with P-521 to keep the largest standardized ECDSA curve; graphs label this as “RSA-30720 (512) / ECDSA P-521 (~256)” for clarity.
 - The scripts are intended to be run on a machine with sufficient CPU for high-key benchmarks. For long-running benchmarks, run on a dedicated server or CI with more CPU cores.
 
 ## Commit & Branch
