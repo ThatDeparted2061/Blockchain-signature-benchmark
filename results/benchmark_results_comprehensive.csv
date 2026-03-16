@@ -1,0 +1,5 @@
+security_bits,rsa_key_size,ecdsa_curve,notes,rsa_sign_ms,rsa_verify_ms,rsa_cpu_time,rsa_memory_mb,rsa_public_key_size,rsa_signature_size,ecdsa_sign_ms,ecdsa_verify_ms,ecdsa_cpu_time,ecdsa_memory_mb,ecdsa_public_key_size,ecdsa_signature_size,sign_ratio_rsa_ecdsa,verify_ratio_rsa_ecdsa
+112,2048,secp224r1,secp256k1 stronger (~128-bit),0.84,0.04,5,67.42,451,256,0.06,0.07,5,67.57,162,64,14.36,0.52
+128,3072,P-256,Modern standard baseline,1.65,0.05,5,67.6,625,384,0.04,0.06,5,67.76,178,71,42.17,0.83
+192,7680,P-384,High security,30.01,0.21,3,67.61,1405,960,0.52,0.46,3,67.61,215,102,57.33,0.44
+256,15360,P-521,Max standardized ECDSA,171.63,0.85,4,50.85,2705,1920,0.56,0.37,4,51.39,268,138,305.13,2.31
