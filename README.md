@@ -24,21 +24,25 @@ python ecdsa_vs_rsa_benchmark.py --warmup 1 --iters 1 --max-rsa 2048 --out resul
 
 ## Generate graphs
 
-After running the benchmark, generate graphs from the CSV output (saved to `results/` by default):
+After running the benchmark, generate graphs from the CSV output (saved to `results/benchmark_results/` by default):
 
 ```bash
-python results/plot_results.py --csv results/benchmark_results_comprehensive.csv --outdir results
+python results/plot_results.py --csv results/benchmark_results_comprehensive.csv --outdir results/benchmark_results
 ```
 
-This will produce PNG graphs in the results directory:
+This will produce PNG graphs in the results/benchmark_results directory:
 
 - signing_time.png
 - verification_time.png
+- public_key_sizes.png
+- signature_sizes.png
+- keygen_time.png (when key generation metrics are present)
+- memory_usage.png
+- transaction_scaling_computation_time.png
+- transaction_scaling_verification_time.png
 - verification_time_112bit.png (and other security levels)
 - verification_cpu_time_112bit.png (and other security levels)
 - verification_speed_25000.png
-- key_sizes.png
-- signature_sizes.png
 - signing_cpu_time.png
 
 ## Metrics Explained
