@@ -7,9 +7,12 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-TRANSACTION_COUNTS = [5000, 10000, 15000, 20000, 25000, 30000]
+# Transaction counts used for scaling analyses.
+OPERATION_COUNTS = [5000, 10000, 15000, 20000, 25000, 30000]
 REFERENCE_COUNT = 25000
 EPSILON = 1e-9
+ANNOTATION_OFFSET_SMALL = 8
+ANNOTATION_OFFSET_LARGE = 14
 DEFAULT_OUTDIR = os.path.join('results', 'benchmark_results')
 
 
@@ -37,7 +40,7 @@ def pick_value(row, *keys):
     return None
 
 
-def parse_memory_mb(row, mb_key, kb_key):
+def normalize_memory_mb(row, mb_key, kb_key):
     mb_value = to_float(row.get(mb_key))
     if mb_value is not None:
         return mb_value
@@ -70,8 +73,8 @@ def normalize_rows(rows):
             'ecdsa_keygen_ms': to_float(pick_value(row, 'ecdsa_keygen_wall_ms')),
             'rsa_cpu_ms': to_float(pick_value(row, 'rsa_sign_cpu_ms_median', 'rsa_cpu_time')),
             'ecdsa_cpu_ms': to_float(pick_value(row, 'ecdsa_sign_cpu_ms_median', 'ecdsa_cpu_time')),
-            'rsa_memory_mb': parse_memory_mb(row, 'rsa_memory_mb', 'rsa_peak_rss_kb'),
-            'ecdsa_memory_mb': parse_memory_mb(row, 'ecdsa_memory_mb', 'ecdsa_peak_rss_kb'),
+            'rsa_memory_mb': normalize_memory_mb(row, 'rsa_memory_mb', 'rsa_peak_rss_kb'),
+            'ecdsa_memory_mb': normalize_memory_mb(row, 'ecdsa_memory_mb', 'ecdsa_peak_rss_kb'),
             'rsa_verify_cpu_ms': to_float(pick_value(row, 'rsa_verify_cpu_ms_median')),
             'ecdsa_verify_cpu_ms': to_float(pick_value(row, 'ecdsa_verify_cpu_ms_median')),
         })
@@ -88,33 +91,39 @@ def calculate_verifications_per_second(median_ms, count):
     if median_ms is None or median_ms == 0:
         return None
     total_time = calculate_total_seconds(median_ms, count)
-    if total_time in (None, 0):
+    if total_time is None or total_time == 0:
         return None
     return count / total_time
 
 
 def annotate_ratios(ax, x_vals, rsa_vals, ecdsa_vals, color=None):
     for x_val, rsa_val, ecdsa_val in zip(x_vals, rsa_vals, ecdsa_vals):
-        if rsa_val is None or ecdsa_val is None or ecdsa_val <= EPSILON:
-            continue
-        ratio = rsa_val / ecdsa_val
-        y_val = max(rsa_val, ecdsa_val)
-        ax.annotate(
-            f"{ratio:.2f}x",
-            xy=(x_val, y_val),
-            xytext=(0, 8),
-            textcoords='offset points',
-            ha='center',
-            fontsize=8,
-            color=color,
-        )
+        annotate_single_ratio(ax, x_val, rsa_val, ecdsa_val, color=color)
+
+
+def annotate_single_ratio(ax, x_val, rsa_val, ecdsa_val, color=None):
+    if rsa_val is None or ecdsa_val is None or ecdsa_val <= EPSILON:
+        return
+    ratio = rsa_val / ecdsa_val
+    y_val = max(rsa_val, ecdsa_val)
+    # Use a larger offset when RSA dominates to reduce annotation overlap.
+    offset = ANNOTATION_OFFSET_LARGE if rsa_val >= ecdsa_val else ANNOTATION_OFFSET_SMALL
+    ax.annotate(
+        f"{ratio:.2f}x",
+        xy=(x_val, y_val),
+        xytext=(0, offset),
+        textcoords='offset points',
+        ha='center',
+        fontsize=8,
+        color=color,
+    )
 
 
 def plot_comparison_lines(x_vals, rsa_vals, ecdsa_vals, xlabel, ylabel, title, out_path):
     if any(val is None for val in rsa_vals + ecdsa_vals):
-        return False
+        return
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.plot(x_vals, rsa_vals, marker='o', label='RSA (probabilistic)')
+    ax.plot(x_vals, rsa_vals, marker='o', label='RSA-PSS')
     ax.plot(x_vals, ecdsa_vals, marker='o', label='ECDSA')
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
@@ -126,44 +135,45 @@ def plot_comparison_lines(x_vals, rsa_vals, ecdsa_vals, xlabel, ylabel, title, o
     fig.tight_layout()
     fig.savefig(out_path, dpi=150)
     plt.close(fig)
-    return True
 
 
 def plot_transaction_scaling(rows, out_path, rsa_field, ecdsa_field, title, ylabel):
     fig, ax = plt.subplots(figsize=(11, 7))
     cmap = plt.get_cmap('tab10')
 
-    for idx, row in enumerate(rows):
+    color_index = 0
+    for row in rows:
         rsa_ms = row[rsa_field]
         ecdsa_ms = row[ecdsa_field]
         if rsa_ms is None or ecdsa_ms is None:
             continue
-        color = cmap(idx % 10)
-        rsa_totals = [calculate_total_seconds(rsa_ms, count) for count in TRANSACTION_COUNTS]
-        ecdsa_totals = [calculate_total_seconds(ecdsa_ms, count) for count in TRANSACTION_COUNTS]
+        color = cmap(color_index % cmap.N)
+        color_index += 1
+        rsa_totals = [calculate_total_seconds(rsa_ms, count) for count in OPERATION_COUNTS]
+        ecdsa_totals = [calculate_total_seconds(ecdsa_ms, count) for count in OPERATION_COUNTS]
         security_bits = row['security_bits']
         ax.plot(
-            TRANSACTION_COUNTS,
+            OPERATION_COUNTS,
             rsa_totals,
             marker='o',
             linestyle='-',
             color=color,
-            label=f"{security_bits}-bit RSA",
+            label=f"{security_bits}-bit RSA-PSS",
         )
         ax.plot(
-            TRANSACTION_COUNTS,
+            OPERATION_COUNTS,
             ecdsa_totals,
             marker='o',
             linestyle='--',
             color=color,
             label=f"{security_bits}-bit ECDSA",
         )
-        annotate_ratios(ax, [TRANSACTION_COUNTS[-1]], [rsa_totals[-1]], [ecdsa_totals[-1]], color=color)
+        annotate_single_ratio(ax, OPERATION_COUNTS[-1], rsa_totals[-1], ecdsa_totals[-1], color=color)
 
-    ax.set_xlabel('Transaction count')
+    ax.set_xlabel('Transaction Count')
     ax.set_ylabel(ylabel)
     ax.set_title(title)
-    ax.set_xticks(TRANSACTION_COUNTS)
+    ax.set_xticks(OPERATION_COUNTS)
     ax.grid(axis='y', alpha=0.3)
     ax.legend(fontsize=8, ncol=2)
     fig.tight_layout()
@@ -184,13 +194,13 @@ def main():
         print('No rows found in', args.csv)
         return
 
-    security_bits = [row['security_bits'] for row in rows]
+    security_levels = [row['security_bits'] for row in rows]
 
     metrics = [
         (
             'signing_time.png',
-            'Computation (Signing) Time vs Security Level',
-            'Computation time (ms)',
+            'Signing Time vs Security Level',
+            'Signing time (ms)',
             'rsa_sign_ms',
             'ecdsa_sign_ms',
         ),
@@ -242,7 +252,7 @@ def main():
         rsa_vals = [row[rsa_key] for row in rows]
         ecdsa_vals = [row[ecdsa_key] for row in rows]
         plot_comparison_lines(
-            security_bits,
+            security_levels,
             rsa_vals,
             ecdsa_vals,
             'Security level (bits)',
@@ -256,7 +266,7 @@ def main():
         os.path.join(args.outdir, 'transaction_scaling_computation_time.png'),
         'rsa_sign_ms',
         'ecdsa_sign_ms',
-        'Computation Time vs Transaction Count (All Security Levels)',
+        'Signing Time vs Transaction Count (All Security Levels)',
         'Total computation time (s)',
     )
     plot_transaction_scaling(
@@ -269,40 +279,40 @@ def main():
     )
 
     for row in rows:
-        security_bits_value = row['security_bits']
+        security_bits = row['security_bits']
         rsa_verify_wall = row['rsa_verify_ms']
         ecdsa_verify_wall = row['ecdsa_verify_ms']
         rsa_verify_cpu = row['rsa_verify_cpu_ms']
         ecdsa_verify_cpu = row['ecdsa_verify_cpu_ms']
 
-        rsa_verify_totals = [calculate_total_seconds(rsa_verify_wall, count) for count in TRANSACTION_COUNTS]
-        ecdsa_verify_totals = [calculate_total_seconds(ecdsa_verify_wall, count) for count in TRANSACTION_COUNTS]
+        rsa_verify_totals = [calculate_total_seconds(rsa_verify_wall, count) for count in OPERATION_COUNTS]
+        ecdsa_verify_totals = [calculate_total_seconds(ecdsa_verify_wall, count) for count in OPERATION_COUNTS]
         plot_comparison_lines(
-            TRANSACTION_COUNTS,
+            OPERATION_COUNTS,
             rsa_verify_totals,
             ecdsa_verify_totals,
-            'Transaction count',
+            'Transaction Count',
             'Total verification time (s)',
-            f"Verification Time vs Transactions ({security_bits_value}-bit)",
-            os.path.join(args.outdir, f"verification_time_{security_bits_value}bit.png"),
+            f"Verification Time vs Transaction Count ({security_bits}-bit)",
+            os.path.join(args.outdir, f"verification_time_{security_bits}bit.png"),
         )
 
-        rsa_verify_cpu_totals = [calculate_total_seconds(rsa_verify_cpu, count) for count in TRANSACTION_COUNTS]
-        ecdsa_verify_cpu_totals = [calculate_total_seconds(ecdsa_verify_cpu, count) for count in TRANSACTION_COUNTS]
+        rsa_verify_cpu_totals = [calculate_total_seconds(rsa_verify_cpu, count) for count in OPERATION_COUNTS]
+        ecdsa_verify_cpu_totals = [calculate_total_seconds(ecdsa_verify_cpu, count) for count in OPERATION_COUNTS]
         plot_comparison_lines(
-            TRANSACTION_COUNTS,
+            OPERATION_COUNTS,
             rsa_verify_cpu_totals,
             ecdsa_verify_cpu_totals,
-            'Transaction count',
+            'Transaction Count',
             'Total verification CPU time (s)',
-            f"Verification CPU Time vs Transactions ({security_bits_value}-bit)",
-            os.path.join(args.outdir, f"verification_cpu_time_{security_bits_value}bit.png"),
+            f"Verification CPU Time vs Transaction Count ({security_bits}-bit)",
+            os.path.join(args.outdir, f"verification_cpu_time_{security_bits}bit.png"),
         )
 
     rsa_speed_25k = [calculate_verifications_per_second(row['rsa_verify_ms'], REFERENCE_COUNT) for row in rows]
     ecdsa_speed_25k = [calculate_verifications_per_second(row['ecdsa_verify_ms'], REFERENCE_COUNT) for row in rows]
     ratio_labels = []
-    for security_label, rsa_speed, ecdsa_speed in zip(security_bits, rsa_speed_25k, ecdsa_speed_25k):
+    for security_label, rsa_speed, ecdsa_speed in zip(security_levels, rsa_speed_25k, ecdsa_speed_25k):
         if rsa_speed is None or ecdsa_speed is None or ecdsa_speed <= EPSILON:
             ratio_label = 'R/E N/A'
         else:
@@ -310,9 +320,9 @@ def main():
         ratio_labels.append(f"{security_label}\n{ratio_label}")
 
     plt.figure(figsize=(10, 7))
-    x_vals = range(len(security_bits))
+    x_vals = range(len(security_levels))
     width = 0.35
-    plt.bar([i - width / 2 for i in x_vals], rsa_speed_25k, width=width, label='RSA')
+    plt.bar([i - width / 2 for i in x_vals], rsa_speed_25k, width=width, label='RSA-PSS')
     plt.bar([i + width / 2 for i in x_vals], ecdsa_speed_25k, width=width, label='ECDSA')
     plt.xticks(x_vals, ratio_labels)
     plt.ylabel('Verifications per second')

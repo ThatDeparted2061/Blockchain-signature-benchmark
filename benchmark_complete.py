@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-COMPREHENSIVE ECDSA vs RSA-OAEP Benchmark
+COMPREHENSIVE ECDSA vs RSA-PSS Benchmark
 ============================================
 Full cryptographic performance comparison across 5 security levels
-Generates CSV results + 6 matplotlib graphs
+Generates CSV results + matplotlib graphs
 
 USAGE:
     python3 benchmark_complete.py
@@ -103,8 +103,8 @@ def get_cpu_time():
 # ============================================================================
 
 def benchmark_rsa(key_size, security_bits):
-    """Benchmark RSA-OAEP operations"""
-    print(f"   🔓 RSA-OAEP ({key_size}-bit)...", end=" ", flush=True)
+    """Benchmark RSA-PSS operations"""
+    print(f"   🔓 RSA-PSS ({key_size}-bit)...", end=" ", flush=True)
     
     try:
         iterations = ITERATIONS.get(key_size, 1)
@@ -254,7 +254,7 @@ def run_benchmark():
     """Run comprehensive benchmark"""
     
     print("=" * 80)
-    print("🔐 COMPREHENSIVE ECDSA vs RSA-OAEP Benchmark")
+    print("🔐 COMPREHENSIVE ECDSA vs RSA-PSS Benchmark")
     print("=" * 80)
     print(f"Started: {datetime.now()}\n")
     
@@ -326,10 +326,23 @@ def generate_graphs(results):
     """Generate comparison graphs from the saved CSV."""
     GRAPHS_DIR.mkdir(exist_ok=True)
     plot_script = OUTPUT_DIR / "plot_results.py"
-    subprocess.run(
-        [sys.executable, str(plot_script), "--csv", str(CSV_PATH), "--outdir", str(GRAPHS_DIR)],
-        check=True,
-    )
+    try:
+        result = subprocess.run(
+            [sys.executable, str(plot_script), "--csv", str(CSV_PATH), "--outdir", str(GRAPHS_DIR)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        if result.stdout:
+            print(result.stdout, end="")
+    except subprocess.CalledProcessError as exc:
+        stderr_output = exc.stderr.strip() if exc.stderr else "No stderr output."
+        print(
+            "❌ Plot generation failed when calling plot_results.py "
+            f"for CSV {CSV_PATH} with output {GRAPHS_DIR}: {exc}. "
+            f"Stderr: {stderr_output}"
+        )
+        raise
     print(f"\n✅ All graphs saved to: {GRAPHS_DIR}\n")
 
 def print_summary(results):
