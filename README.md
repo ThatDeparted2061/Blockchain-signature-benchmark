@@ -15,8 +15,8 @@ pip install -r requirements.txt
 The new comprehensive benchmark script compares RSA (PSS) and ECDSA across mapped security levels and emits CSV results.
 
 ```bash
-# run full benchmark (may be slow for large RSA keys)
-python ecdsa_vs_rsa_benchmark.py --warmup 1 --iters 3 --max-rsa 3072 --out results/benchmark_results_comprehensive.csv
+# run full benchmark (may be slow for large RSA keys, includes 512-bit RSA-30720)
+python ecdsa_vs_rsa_benchmark.py --warmup 1 --iters 3 --max-rsa 30720 --out results/benchmark_results_comprehensive.csv
 
 # run smoke test (quick, good for CI)
 python ecdsa_vs_rsa_benchmark.py --warmup 1 --iters 1 --max-rsa 2048 --out results/benchmark_results_comprehensive.csv
@@ -34,6 +34,9 @@ This will produce PNG graphs in the results directory:
 
 - signing_time.png
 - verification_time.png
+- verification_time_112bit.png (and other security levels)
+- verification_cpu_time_112bit.png (and other security levels)
+- verification_speed_25000.png
 - key_sizes.png
 - signature_sizes.png
 - signing_cpu_time.png
@@ -51,6 +54,7 @@ This will produce PNG graphs in the results directory:
 
 - RSA signing uses RSASSA-PSS (padding.PSS with SHA-256) — OAEP is for encryption and not used for signatures.
 - Large RSA keys (>= 7680 bits) are slow to generate; use `--max-rsa` to limit experiments for faster runs.
+- The 512-bit row pairs RSA-30720 with P-521 to keep the largest standardized ECDSA curve; graphs label this as “RSA-30720 (512) / ECDSA P-521 (~256)” for clarity.
 - The scripts are intended to be run on a machine with sufficient CPU for high-key benchmarks. For long-running benchmarks, run on a dedicated server or CI with more CPU cores.
 
 ## Commit & Branch

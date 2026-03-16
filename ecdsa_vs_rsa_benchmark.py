@@ -11,21 +11,36 @@ security_levels = [
         'security_bits': 112,
         'rsa_key_size': 2048,
         'ecdsa_curve': ec.SECP224R1(),
+        'notes': '',
+        'label': '112',
     },
     {
         'security_bits': 128,
         'rsa_key_size': 3072,
         'ecdsa_curve': ec.SECP256R1(),
+        'notes': '',
+        'label': '128',
     },
     {
         'security_bits': 192,
         'rsa_key_size': 7680,
         'ecdsa_curve': ec.SECP384R1(),
+        'notes': '',
+        'label': '192',
     },
     {
         'security_bits': 256,
         'rsa_key_size': 15360,
         'ecdsa_curve': ec.SECP521R1(),
+        'notes': '',
+        'label': '256',
+    },
+    {
+        'security_bits': 512,
+        'rsa_key_size': 30720,
+        'ecdsa_curve': ec.SECP521R1(),
+        'notes': 'ECDSA P-521 provides ~256-bit security; 512-bit row uses largest standardized curve.',
+        'label': 'RSA-30720 (512) / ECDSA P-521 (~256)',
     },
 ]
 
@@ -172,7 +187,7 @@ def main():
     parser = argparse.ArgumentParser(description='ECDSA vs RSA benchmark (comprehensive)')
     parser.add_argument('--warmup', type=int, default=1, help='Warm-up iterations')
     parser.add_argument('--iters', type=int, default=3, help='Measured iterations')
-    parser.add_argument('--max-rsa', type=int, default=15360, help='Maximum RSA key size to test')
+    parser.add_argument('--max-rsa', type=int, default=30720, help='Maximum RSA key size to test (30720 can take 20-45+ minutes)')
     parser.add_argument('--out', type=str, default='results/benchmark_results_comprehensive.csv', help='CSV output path')
     args = parser.parse_args()
 
@@ -186,8 +201,10 @@ def main():
 
         results.append({
             'security_bits': level['security_bits'],
+            'security_label': level.get('label', str(level['security_bits'])),
             'rsa_key_size': rsa_metrics['key_size_bits'],
             'ecdsa_curve': ecdsa_metrics['curve'],
+            'notes': level.get('notes', ''),
             'rsa_public_key_size': rsa_metrics.get('public_key_size_bytes'),
             'rsa_keygen_wall_ms': rsa_metrics['keygen_wall_ms'],
             'rsa_keygen_cpu_ms': rsa_metrics['keygen_cpu_ms'],
@@ -209,7 +226,7 @@ def main():
         })
 
     # write CSV
-    keys = ['security_bits', 'rsa_key_size', 'rsa_public_key_size', 'ecdsa_curve', 'ecdsa_public_key_size',
+    keys = ['security_bits', 'security_label', 'rsa_key_size', 'rsa_public_key_size', 'ecdsa_curve', 'ecdsa_public_key_size', 'notes',
             'rsa_keygen_wall_ms', 'rsa_keygen_cpu_ms', 'rsa_sign_wall_ms_median', 'rsa_sign_cpu_ms_median',
             'rsa_verify_wall_ms_median', 'rsa_verify_cpu_ms_median', 'rsa_signature_size', 'rsa_peak_rss_kb',
             'ecdsa_keygen_wall_ms', 'ecdsa_keygen_cpu_ms', 'ecdsa_sign_wall_ms_median', 'ecdsa_sign_cpu_ms_median',
