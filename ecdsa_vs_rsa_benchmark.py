@@ -27,6 +27,11 @@ security_levels = [
         'rsa_key_size': 15360,
         'ecdsa_curve': ec.SECP521R1(),
     },
+    {
+        'security_bits': 512,
+        'rsa_key_size': 30720,
+        'ecdsa_curve': ec.SECP521R1(),
+    },
 ]
 
 
@@ -172,7 +177,7 @@ def main():
     parser = argparse.ArgumentParser(description='ECDSA vs RSA benchmark (comprehensive)')
     parser.add_argument('--warmup', type=int, default=1, help='Warm-up iterations')
     parser.add_argument('--iters', type=int, default=3, help='Measured iterations')
-    parser.add_argument('--max-rsa', type=int, default=15360, help='Maximum RSA key size to test')
+    parser.add_argument('--max-rsa', type=int, default=30720, help='Maximum RSA key size to test')
     parser.add_argument('--out', type=str, default='results/benchmark_results_comprehensive.csv', help='CSV output path')
     args = parser.parse_args()
 

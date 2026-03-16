@@ -15,8 +15,8 @@ pip install -r requirements.txt
 The new comprehensive benchmark script compares RSA (PSS) and ECDSA across mapped security levels and emits CSV results.
 
 ```bash
-# run full benchmark (may be slow for large RSA keys)
-python ecdsa_vs_rsa_benchmark.py --warmup 1 --iters 3 --max-rsa 3072 --out results/benchmark_results_comprehensive.csv
+# run full benchmark (may be slow for large RSA keys, includes 512-bit RSA-30720)
+python ecdsa_vs_rsa_benchmark.py --warmup 1 --iters 3 --max-rsa 30720 --out results/benchmark_results_comprehensive.csv
 
 # run smoke test (quick, good for CI)
 python ecdsa_vs_rsa_benchmark.py --warmup 1 --iters 1 --max-rsa 2048 --out results/benchmark_results_comprehensive.csv
@@ -34,6 +34,9 @@ This will produce PNG graphs in the results directory:
 
 - signing_time.png
 - verification_time.png
+- verification_time_112bit.png (and other security levels)
+- verification_cpu_time_112bit.png (and other security levels)
+- verification_speed_25000.png
 - key_sizes.png
 - signature_sizes.png
 - signing_cpu_time.png
