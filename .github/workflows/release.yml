@@ -38,7 +38,7 @@ jobs:
 
       - name: Generate plots
         run: |
-          python results/plot_results.py --csv results/benchmark_results_comprehensive.csv --outdir results
+          python results/plot_results.py --csv results/benchmark_results_comprehensive.csv --outdir results/benchmark_results
 
       - name: Create observations
         run: |
@@ -48,7 +48,7 @@ jobs:
           This release was generated automatically by the CI pipeline. It includes the following artifacts:
 
           - results/benchmark_results_comprehensive.csv: raw CSV data used for plots
-          - results/*.png: generated graphs
+          - results/benchmark_results/*.png: generated graphs
 
           Please review the CSV for detailed numbers. If you need a full run for the largest RSA sizes, re-run locally on a larger machine.
           EOF
@@ -72,7 +72,7 @@ jobs:
           name: Release ${{ github.run_number }}
           files: |
             results/benchmark_results_comprehensive.csv
-            results/*.png
+            results/benchmark_results/*.png
             results/observations.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

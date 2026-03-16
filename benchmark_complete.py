@@ -17,7 +17,7 @@ RUNTIME:
 
 OUTPUT:
     - benchmark_results_comprehensive.csv
-    - graphs/ folder with 6 PNG files
+    - benchmark_results/ folder with generated PNG files
 """
 
 import time
@@ -26,6 +26,7 @@ import json
 import psutil
 import os
 import sys
+import subprocess
 from pathlib import Path
 from datetime import datetime
 
@@ -74,7 +75,7 @@ ITERATIONS = {
 TEST_MESSAGE = b"Blockchain transaction data for signing and verification benchmark"
 
 OUTPUT_DIR = Path(__file__).parent / "results"
-GRAPHS_DIR = OUTPUT_DIR / "graphs"
+GRAPHS_DIR = OUTPUT_DIR / "benchmark_results"
 CSV_PATH = OUTPUT_DIR / "benchmark_results_comprehensive.csv"
 
 # ============================================================================
@@ -322,116 +323,13 @@ def save_results(results):
     print(f"✅ CSV saved: {CSV_PATH}\n")
 
 def generate_graphs(results):
-    """Generate 6 comparison graphs"""
+    """Generate comparison graphs from the saved CSV."""
     GRAPHS_DIR.mkdir(exist_ok=True)
-    
-    security_bits = [r['security_bits'] for r in results]
-    rsa_sign = [r['rsa_sign_ms'] for r in results]
-    ecdsa_sign = [r['ecdsa_sign_ms'] for r in results]
-    rsa_verify = [r['rsa_verify_ms'] for r in results]
-    ecdsa_verify = [r['ecdsa_verify_ms'] for r in results]
-    rsa_cpu = [r['rsa_cpu_time'] for r in results]
-    ecdsa_cpu = [r['ecdsa_cpu_time'] for r in results]
-    rsa_mem = [r['rsa_memory_mb'] for r in results]
-    ecdsa_mem = [r['ecdsa_memory_mb'] for r in results]
-    rsa_key = [r['rsa_public_key_size'] / 1024 for r in results]  # KB
-    ecdsa_key = [r['ecdsa_public_key_size'] / 1024 for r in results]
-    rsa_sig = [r['rsa_signature_size'] for r in results]
-    ecdsa_sig = [r['ecdsa_signature_size'] for r in results]
-    
-    x = range(len(security_bits))
-    width = 0.35
-    
-    # 1. Signing Time
-    plt.figure(figsize=(12, 6))
-    plt.bar([i - width/2 for i in x], rsa_sign, width, label='RSA-OAEP', alpha=0.8)
-    plt.bar([i + width/2 for i in x], ecdsa_sign, width, label='ECDSA', alpha=0.8)
-    plt.xlabel('Security Level (bits)')
-    plt.ylabel('Sign Time (ms)')
-    plt.title('Signing Time Comparison')
-    plt.xticks(x, security_bits)
-    plt.legend()
-    plt.grid(axis='y', alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(GRAPHS_DIR / 'signing_time.png', dpi=150)
-    plt.close()
-    print("✅ signing_time.png")
-    
-    # 2. Verification Time
-    plt.figure(figsize=(12, 6))
-    plt.bar([i - width/2 for i in x], rsa_verify, width, label='RSA-OAEP', alpha=0.8)
-    plt.bar([i + width/2 for i in x], ecdsa_verify, width, label='ECDSA', alpha=0.8)
-    plt.xlabel('Security Level (bits)')
-    plt.ylabel('Verify Time (ms)')
-    plt.title('Verification Time Comparison')
-    plt.xticks(x, security_bits)
-    plt.legend()
-    plt.grid(axis='y', alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(GRAPHS_DIR / 'verification_time.png', dpi=150)
-    plt.close()
-    print("✅ verification_time.png")
-    
-    # 3. CPU Time
-    plt.figure(figsize=(12, 6))
-    plt.bar([i - width/2 for i in x], rsa_cpu, width, label='RSA-OAEP', alpha=0.8)
-    plt.bar([i + width/2 for i in x], ecdsa_cpu, width, label='ECDSA', alpha=0.8)
-    plt.xlabel('Security Level (bits)')
-    plt.ylabel('CPU Time (s)')
-    plt.title('CPU Time Consumption')
-    plt.xticks(x, security_bits)
-    plt.legend()
-    plt.grid(axis='y', alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(GRAPHS_DIR / 'cpu_time.png', dpi=150)
-    plt.close()
-    print("✅ cpu_time.png")
-    
-    # 4. Memory Usage
-    plt.figure(figsize=(12, 6))
-    plt.bar([i - width/2 for i in x], rsa_mem, width, label='RSA-OAEP', alpha=0.8)
-    plt.bar([i + width/2 for i in x], ecdsa_mem, width, label='ECDSA', alpha=0.8)
-    plt.xlabel('Security Level (bits)')
-    plt.ylabel('Peak Memory (MB)')
-    plt.title('Memory Usage')
-    plt.xticks(x, security_bits)
-    plt.legend()
-    plt.grid(axis='y', alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(GRAPHS_DIR / 'memory_usage.png', dpi=150)
-    plt.close()
-    print("✅ memory_usage.png")
-    
-    # 5. Public Key Size
-    plt.figure(figsize=(12, 6))
-    plt.bar([i - width/2 for i in x], rsa_key, width, label='RSA-OAEP', alpha=0.8)
-    plt.bar([i + width/2 for i in x], ecdsa_key, width, label='ECDSA', alpha=0.8)
-    plt.xlabel('Security Level (bits)')
-    plt.ylabel('Key Size (KB)')
-    plt.title('Public Key Size Comparison')
-    plt.xticks(x, security_bits)
-    plt.legend()
-    plt.grid(axis='y', alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(GRAPHS_DIR / 'key_size.png', dpi=150)
-    plt.close()
-    print("✅ key_size.png")
-    
-    # 6. Signature Size
-    plt.figure(figsize=(12, 6))
-    plt.bar([i - width/2 for i in x], rsa_sig, width, label='RSA-OAEP', alpha=0.8)
-    plt.bar([i + width/2 for i in x], ecdsa_sig, width, label='ECDSA', alpha=0.8)
-    plt.xlabel('Security Level (bits)')
-    plt.ylabel('Signature Size (bytes)')
-    plt.title('Signature Size Comparison')
-    plt.xticks(x, security_bits)
-    plt.legend()
-    plt.grid(axis='y', alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(GRAPHS_DIR / 'signature_size.png', dpi=150)
-    plt.close()
-    print("✅ signature_size.png")
-    
+    plot_script = OUTPUT_DIR / "plot_results.py"
+    subprocess.run(
+        [sys.executable, str(plot_script), "--csv", str(CSV_PATH), "--outdir", str(GRAPHS_DIR)],
+        check=True,
+    )
     print(f"\n✅ All graphs saved to: {GRAPHS_DIR}\n")
 
 def print_summary(results):
