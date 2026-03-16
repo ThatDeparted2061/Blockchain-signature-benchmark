@@ -19,13 +19,70 @@ pip install cryptography matplotlib psutil
 ## Run the Benchmark
 
 ```bash
+<<<<<<< HEAD
 python3 benchmark_complete.py
+=======
+<<<<<<< HEAD
+# run full benchmark (may be slow for large RSA keys, includes 512-bit RSA-30720)
+python ecdsa_vs_rsa_benchmark.py --warmup 1 --iters 3 --max-rsa 30720 --out results/benchmark_results_comprehensive.csv
+
+# run smoke test (quick, good for CI)
+python ecdsa_vs_rsa_benchmark.py --warmup 1 --iters 1 --max-rsa 2048 --out results/benchmark_results_comprehensive.csv
+=======
+python3 benchmark_complete.py
+>>>>>>> bb8ae4e (Docs: README updated to reflect cleaned-up benchmarking scripts—only benchmark_complete.py is needed.)
+>>>>>>> fbd053f (Cleanup: Remove obsolete benchmarking scripts; keep only benchmark_complete.py and outputs.)
 ```
 
 - Full suite covers: 112, 128, 192, 256, and 512 bits (RSA and ECDSA).
 - Outputs CSV: `results/benchmark_results_comprehensive.csv`
 - Produces six graphs saved in `results/graphs/`
 
+<<<<<<< HEAD
+## Output Files
+=======
+<<<<<<< HEAD
+After running the benchmark, generate graphs from the CSV output (saved to `results/benchmark_results/` by default):
+>>>>>>> fbd053f (Cleanup: Remove obsolete benchmarking scripts; keep only benchmark_complete.py and outputs.)
+
+- CSV results: `results/benchmark_results_comprehensive.csv`
+- Graphs folder: `results/graphs/` (PNG files)
+
+## Metrics Reported
+- Key generation time
+- Signing and verification time
+- CPU and memory usage
+- Key and signature sizes
+- Ratios for performance comparisons (RSA/ECDSA)
+
+<<<<<<< HEAD
+## Key Notes
+- RSA signing uses RSASSA-PSS for secure, probabilistic signatures.
+- No other .py benchmarking scripts are needed—`benchmark_complete.py` replaces prior scripts for clarity.
+- For lab or CI runs, expect longer runtimes for ultra-large keys (RSA 15360/30720 bits).
+
+## Cleaning Up
+All auxiliary benchmarking scripts have been removed to avoid confusion. Only `benchmark_complete.py` and its result files remain.
+
+## License
+MIT
+
+---
+For any new benchmarks or features, use and extend `benchmark_complete.py` as the single source of truth.
+=======
+- signing_time.png
+- verification_time.png
+- public_key_sizes.png
+- signature_sizes.png
+- keygen_time.png (when key generation metrics are present)
+- memory_usage.png
+- transaction_scaling_computation_time.png
+- transaction_scaling_verification_time.png
+- verification_time_112bit.png (and other security levels)
+- verification_cpu_time_112bit.png (and other security levels)
+- verification_speed_25000.png
+- signing_cpu_time.png
+=======
 ## Output Files
 
 - CSV results: `results/benchmark_results_comprehensive.csv`
@@ -42,6 +99,7 @@ python3 benchmark_complete.py
 - RSA signing uses RSASSA-PSS for secure, probabilistic signatures.
 - No other .py benchmarking scripts are needed—`benchmark_complete.py` replaces prior scripts for clarity.
 - For lab or CI runs, expect longer runtimes for ultra-large keys (RSA 15360/30720 bits).
+>>>>>>> bb8ae4e (Docs: README updated to reflect cleaned-up benchmarking scripts—only benchmark_complete.py is needed.)
 
 ## Cleaning Up
 All auxiliary benchmarking scripts have been removed to avoid confusion. Only `benchmark_complete.py` and its result files remain.
@@ -49,5 +107,19 @@ All auxiliary benchmarking scripts have been removed to avoid confusion. Only `b
 ## License
 MIT
 
+<<<<<<< HEAD
+## Notes
+
+- RSA signing uses RSASSA-PSS (padding.PSS with SHA-256) — OAEP is for encryption and not used for signatures.
+- Large RSA keys (>= 7680 bits) are slow to generate; use `--max-rsa` to limit experiments for faster runs.
+- The 512-bit row pairs RSA-30720 with P-521 to keep the largest standardized ECDSA curve; graphs label this as “RSA-30720 (512) / ECDSA P-521 (~256)” for clarity.
+- The scripts are intended to be run on a machine with sufficient CPU for high-key benchmarks. For long-running benchmarks, run on a dedicated server or CI with more CPU cores.
+
+## Commit & Branch
+
+The benchmarking additions (comprehensive benchmark and plotting) are on branch `copilot/benchmark-updates`. They will be merged to `main` on request.
+=======
 ---
 For any new benchmarks or features, use and extend `benchmark_complete.py` as the single source of truth.
+>>>>>>> bb8ae4e (Docs: README updated to reflect cleaned-up benchmarking scripts—only benchmark_complete.py is needed.)
+>>>>>>> fbd053f (Cleanup: Remove obsolete benchmarking scripts; keep only benchmark_complete.py and outputs.)
