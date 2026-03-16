@@ -209,9 +209,11 @@ def main():
         })
 
     # write CSV
-    keys = ['security_bits','rsa_key_size','ecdsa_curve',
-            'rsa_keygen_wall_ms','rsa_keygen_cpu_ms','rsa_sign_wall_ms_median','rsa_sign_cpu_ms_median','rsa_verify_wall_ms_median','rsa_verify_cpu_ms_median','rsa_signature_size','rsa_peak_rss_kb',
-            'ecdsa_keygen_wall_ms','ecdsa_keygen_cpu_ms','ecdsa_sign_wall_ms_median','ecdsa_sign_cpu_ms_median','ecdsa_verify_wall_ms_median','ecdsa_verify_cpu_ms_median','ecdsa_signature_size','ecdsa_peak_rss_kb']
+    keys = ['security_bits', 'rsa_key_size', 'rsa_public_key_size', 'ecdsa_curve', 'ecdsa_public_key_size',
+            'rsa_keygen_wall_ms', 'rsa_keygen_cpu_ms', 'rsa_sign_wall_ms_median', 'rsa_sign_cpu_ms_median',
+            'rsa_verify_wall_ms_median', 'rsa_verify_cpu_ms_median', 'rsa_signature_size', 'rsa_peak_rss_kb',
+            'ecdsa_keygen_wall_ms', 'ecdsa_keygen_cpu_ms', 'ecdsa_sign_wall_ms_median', 'ecdsa_sign_cpu_ms_median',
+            'ecdsa_verify_wall_ms_median', 'ecdsa_verify_cpu_ms_median', 'ecdsa_signature_size', 'ecdsa_peak_rss_kb']
     with open(args.out, 'w', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=keys)
         writer.writeheader()
