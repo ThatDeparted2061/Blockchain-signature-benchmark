@@ -22,7 +22,7 @@ pip install cryptography matplotlib psutil
 python3 benchmark_complete.py
 ```
 
-- Full suite covers: 112, 128, 192, 256, and 512 bits (RSA and ECDSA).
+- Full suite covers: 112, 128, and 192 bits (RSA and ECDSA).
 - Outputs CSV: `results/benchmark_results_comprehensive.csv`
 - Produces graphs saved in `results/graphs/`
 

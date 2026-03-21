@@ -40,6 +40,15 @@ try:
     import matplotlib.pyplot as plt
     import matplotlib
     matplotlib.use('Agg')  # Non-interactive backend
+    plt.style.use('seaborn-v0_8')
+    matplotlib.rcParams.update({
+        'figure.dpi': 150,
+        'axes.titlesize': 14,
+        'axes.labelsize': 12,
+        'legend.fontsize': 10,
+        'xtick.labelsize': 10,
+        'ytick.labelsize': 10,
+    })
 except ImportError:
     print("❌ matplotlib not found. Install with: pip install matplotlib")
     sys.exit(1)
@@ -52,8 +61,6 @@ SECURITY_LEVELS = [
     {'bits': 112, 'rsa': 2048, 'ecdsa': 'secp224r1', 'notes': 'secp256k1 stronger (~128-bit)'},
     {'bits': 128, 'rsa': 3072, 'ecdsa': 'P-256', 'notes': 'Modern standard baseline'},
     {'bits': 192, 'rsa': 7680, 'ecdsa': 'P-384', 'notes': 'High security'},
-    {'bits': 256, 'rsa': 15360, 'ecdsa': 'P-521', 'notes': 'Max standardized ECDSA'},
-    {'bits': 512, 'rsa': 30720, 'ecdsa': 'P-521', 'notes': 'Ultra-high security'},
 ]
 
 CURVES = {
@@ -347,92 +354,92 @@ def generate_graphs(results):
     width = 0.35
 
     # 1. Signing Time
-    plt.figure(figsize=(12, 6))
-    plt.bar([i - width/2 for i in x], rsa_sign, width, label='RSA-PSS', alpha=0.8)
-    plt.bar([i + width/2 for i in x], ecdsa_sign, width, label='ECDSA', alpha=0.8)
+    plt.figure(figsize=(10, 5.5))
+    plt.bar([i - width/2 for i in x], rsa_sign, width, label='RSA-PSS', alpha=0.9, color='#4C78A8')
+    plt.bar([i + width/2 for i in x], ecdsa_sign, width, label='ECDSA', alpha=0.9, color='#F58518')
     plt.xlabel('Security Level (bits)')
     plt.ylabel('Sign Time (ms)')
     plt.title('Signing Time Comparison')
     plt.xticks(x, security_bits)
-    plt.legend()
-    plt.grid(axis='y', alpha=0.3)
+    plt.legend(frameon=True)
+    plt.grid(axis='y', alpha=0.25)
     plt.tight_layout()
-    plt.savefig(GRAPHS_DIR / 'signing_time.png', dpi=150)
+    plt.savefig(GRAPHS_DIR / 'signing_time.png')
     plt.close()
     print("✅ signing_time.png")
 
     # 2. Verification Time (single-op)
-    plt.figure(figsize=(12, 6))
-    plt.bar([i - width/2 for i in x], rsa_verify, width, label='RSA-PSS', alpha=0.8)
-    plt.bar([i + width/2 for i in x], ecdsa_verify, width, label='ECDSA', alpha=0.8)
+    plt.figure(figsize=(10, 5.5))
+    plt.bar([i - width/2 for i in x], rsa_verify, width, label='RSA-PSS', alpha=0.9, color='#4C78A8')
+    plt.bar([i + width/2 for i in x], ecdsa_verify, width, label='ECDSA', alpha=0.9, color='#F58518')
     plt.xlabel('Security Level (bits)')
     plt.ylabel('Verify Time (ms)')
     plt.title('Verification Time Comparison (Single Operation)')
     plt.xticks(x, security_bits)
-    plt.legend()
-    plt.grid(axis='y', alpha=0.3)
+    plt.legend(frameon=True)
+    plt.grid(axis='y', alpha=0.25)
     plt.tight_layout()
-    plt.savefig(GRAPHS_DIR / 'verification_time_single.png', dpi=150)
+    plt.savefig(GRAPHS_DIR / 'verification_time_single.png')
     plt.close()
     print("✅ verification_time_single.png")
 
     # 3. CPU Time
-    plt.figure(figsize=(12, 6))
-    plt.bar([i - width/2 for i in x], rsa_cpu, width, label='RSA-PSS', alpha=0.8)
-    plt.bar([i + width/2 for i in x], ecdsa_cpu, width, label='ECDSA', alpha=0.8)
+    plt.figure(figsize=(10, 5.5))
+    plt.bar([i - width/2 for i in x], rsa_cpu, width, label='RSA-PSS', alpha=0.9, color='#4C78A8')
+    plt.bar([i + width/2 for i in x], ecdsa_cpu, width, label='ECDSA', alpha=0.9, color='#F58518')
     plt.xlabel('Security Level (bits)')
     plt.ylabel('CPU Time (s)')
     plt.title('CPU Time Consumption')
     plt.xticks(x, security_bits)
-    plt.legend()
-    plt.grid(axis='y', alpha=0.3)
+    plt.legend(frameon=True)
+    plt.grid(axis='y', alpha=0.25)
     plt.tight_layout()
-    plt.savefig(GRAPHS_DIR / 'cpu_time.png', dpi=150)
+    plt.savefig(GRAPHS_DIR / 'cpu_time.png')
     plt.close()
     print("✅ cpu_time.png")
 
     # 4. Memory Usage
-    plt.figure(figsize=(12, 6))
-    plt.bar([i - width/2 for i in x], rsa_mem, width, label='RSA-PSS', alpha=0.8)
-    plt.bar([i + width/2 for i in x], ecdsa_mem, width, label='ECDSA', alpha=0.8)
+    plt.figure(figsize=(10, 5.5))
+    plt.bar([i - width/2 for i in x], rsa_mem, width, label='RSA-PSS', alpha=0.9, color='#4C78A8')
+    plt.bar([i + width/2 for i in x], ecdsa_mem, width, label='ECDSA', alpha=0.9, color='#F58518')
     plt.xlabel('Security Level (bits)')
     plt.ylabel('Peak Memory (MB)')
     plt.title('Memory Usage')
     plt.xticks(x, security_bits)
-    plt.legend()
-    plt.grid(axis='y', alpha=0.3)
+    plt.legend(frameon=True)
+    plt.grid(axis='y', alpha=0.25)
     plt.tight_layout()
-    plt.savefig(GRAPHS_DIR / 'memory_usage.png', dpi=150)
+    plt.savefig(GRAPHS_DIR / 'memory_usage.png')
     plt.close()
     print("✅ memory_usage.png")
 
     # 5. Public Key Size
-    plt.figure(figsize=(12, 6))
-    plt.bar([i - width/2 for i in x], rsa_key, width, label='RSA-PSS', alpha=0.8)
-    plt.bar([i + width/2 for i in x], ecdsa_key, width, label='ECDSA', alpha=0.8)
+    plt.figure(figsize=(10, 5.5))
+    plt.bar([i - width/2 for i in x], rsa_key, width, label='RSA-PSS', alpha=0.9, color='#4C78A8')
+    plt.bar([i + width/2 for i in x], ecdsa_key, width, label='ECDSA', alpha=0.9, color='#F58518')
     plt.xlabel('Security Level (bits)')
     plt.ylabel('Key Size (KB)')
     plt.title('Public Key Size Comparison')
     plt.xticks(x, security_bits)
-    plt.legend()
-    plt.grid(axis='y', alpha=0.3)
+    plt.legend(frameon=True)
+    plt.grid(axis='y', alpha=0.25)
     plt.tight_layout()
-    plt.savefig(GRAPHS_DIR / 'key_size.png', dpi=150)
+    plt.savefig(GRAPHS_DIR / 'key_size.png')
     plt.close()
     print("✅ key_size.png")
 
     # 6. Signature Size
-    plt.figure(figsize=(12, 6))
-    plt.bar([i - width/2 for i in x], rsa_sig, width, label='RSA-PSS', alpha=0.8)
-    plt.bar([i + width/2 for i in x], ecdsa_sig, width, label='ECDSA', alpha=0.8)
+    plt.figure(figsize=(10, 5.5))
+    plt.bar([i - width/2 for i in x], rsa_sig, width, label='RSA-PSS', alpha=0.9, color='#4C78A8')
+    plt.bar([i + width/2 for i in x], ecdsa_sig, width, label='ECDSA', alpha=0.9, color='#F58518')
     plt.xlabel('Security Level (bits)')
     plt.ylabel('Signature Size (bytes)')
     plt.title('Signature Size Comparison')
     plt.xticks(x, security_bits)
-    plt.legend()
-    plt.grid(axis='y', alpha=0.3)
+    plt.legend(frameon=True)
+    plt.grid(axis='y', alpha=0.25)
     plt.tight_layout()
-    plt.savefig(GRAPHS_DIR / 'signature_size.png', dpi=150)
+    plt.savefig(GRAPHS_DIR / 'signature_size.png')
     plt.close()
     print("✅ signature_size.png")
 
@@ -442,42 +449,42 @@ def generate_graphs(results):
         rsa_verify_total = [v * tx_count for v in rsa_verify]  # ms
         ecdsa_verify_total = [v * tx_count for v in ecdsa_verify]  # ms
 
-        fig, ax1 = plt.subplots(figsize=(12, 6))
-        ax1.bar([i - width/2 for i in x], rsa_verify_total, width, label='RSA-PSS', alpha=0.8)
-        ax1.bar([i + width/2 for i in x], ecdsa_verify_total, width, label='ECDSA', alpha=0.8)
+        fig, ax1 = plt.subplots(figsize=(10, 5.5))
+        ax1.bar([i - width/2 for i in x], rsa_verify_total, width, label='RSA-PSS', alpha=0.9, color='#4C78A8')
+        ax1.bar([i + width/2 for i in x], ecdsa_verify_total, width, label='ECDSA', alpha=0.9, color='#F58518')
         ax1.set_xlabel('Security Level (bits)')
         ax1.set_ylabel('Total Verify Time (ms)')
         ax1.set_title(f'Verification Time for {tx_count:,} Transactions')
         ax1.set_xticks(list(x))
         ax1.set_xticklabels(security_bits)
-        ax1.grid(axis='y', alpha=0.3)
+        ax1.grid(axis='y', alpha=0.25)
 
         ax2 = ax1.twinx()
-        ax2.plot(list(x), verify_ratios, color='black', marker='o', label='RSA/ECDSA Ratio')
+        ax2.plot(list(x), verify_ratios, color='#54A24B', marker='o', label='RSA/ECDSA Ratio')
         ax2.set_ylabel('Verify Time Ratio (RSA / ECDSA)')
 
         lines_1, labels_1 = ax1.get_legend_handles_labels()
         lines_2, labels_2 = ax2.get_legend_handles_labels()
-        ax1.legend(lines_1 + lines_2, labels_1 + labels_2, loc='upper left')
+        ax1.legend(lines_1 + lines_2, labels_1 + labels_2, loc='upper left', frameon=True)
 
         plt.tight_layout()
         fname = GRAPHS_DIR / f'verification_time_{tx_count//1000}k.png'
-        plt.savefig(fname, dpi=150)
+        plt.savefig(fname)
         plt.close()
         print(f"✅ {fname.name}")
 
     # 8. Verification Ratio Summary (across transaction counts)
-    plt.figure(figsize=(12, 6))
+    plt.figure(figsize=(10, 5.5))
     for tx_count in TRANSACTION_COUNTS:
         plt.plot(security_bits, verify_ratios, marker='o', label=f'{tx_count//1000}k tx')
     plt.xlabel('Security Level (bits)')
     plt.ylabel('Verify Time Ratio (RSA / ECDSA)')
     plt.title('Verification Time Ratio Across Security Levels (All Tx Counts)')
     plt.xticks(security_bits)
-    plt.grid(axis='y', alpha=0.3)
-    plt.legend(ncol=3)
+    plt.grid(axis='y', alpha=0.25)
+    plt.legend(ncol=3, frameon=True)
     plt.tight_layout()
-    plt.savefig(GRAPHS_DIR / 'verification_ratio_summary.png', dpi=150)
+    plt.savefig(GRAPHS_DIR / 'verification_ratio_summary.png')
     plt.close()
     print("✅ verification_ratio_summary.png")
 
