@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-COMPREHENSIVE ECDSA vs RSA-OAEP Benchmark
-============================================
+COMPREHENSIVE ECDSA vs Probabilistic RSA (PSS) Benchmark
+=======================================================
 Full cryptographic performance comparison across 5 security levels
-Generates CSV results + 6 matplotlib graphs
+Generates CSV results + matplotlib graphs (incl. verification-time
+transaction scaling + ratio analysis)
 
 USAGE:
     python3 benchmark_complete.py
@@ -17,7 +18,7 @@ RUNTIME:
 
 OUTPUT:
     - benchmark_results_comprehensive.csv
-    - graphs/ folder with 6 PNG files
+    - graphs/ folder with PNG files
 """
 
 import time
@@ -77,6 +78,9 @@ OUTPUT_DIR = Path(__file__).parent / "results"
 GRAPHS_DIR = OUTPUT_DIR / "graphs"
 CSV_PATH = OUTPUT_DIR / "benchmark_results_comprehensive.csv"
 
+# Transaction scaling for verification-time graphs
+TRANSACTION_COUNTS = [5000, 10000, 15000, 20000, 25000, 30000]
+
 # ============================================================================
 # UTILITY FUNCTIONS
 # ============================================================================
@@ -102,12 +106,12 @@ def get_cpu_time():
 # ============================================================================
 
 def benchmark_rsa(key_size, security_bits):
-    """Benchmark RSA-OAEP operations"""
-    print(f"   🔓 RSA-OAEP ({key_size}-bit)...", end=" ", flush=True)
-    
+    """Benchmark probabilistic RSA (PSS) operations"""
+    print(f"   🔓 RSA-PSS ({key_size}-bit)...", end=" ", flush=True)
+
     try:
         iterations = ITERATIONS.get(key_size, 1)
-        
+
         # Key generation
         start_keygen = time.perf_counter()
         private_key = rsa.generate_private_key(
@@ -117,19 +121,19 @@ def benchmark_rsa(key_size, security_bits):
         )
         keygen_time = time.perf_counter() - start_keygen
         public_key = private_key.public_key()
-        
+
         # Key sizes
         public_pem = public_key.public_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo
         )
         public_key_size = len(public_pem)
-        
+
         # Signing
         mem_before = get_memory_mb()
         sign_times = []
         signatures = []
-        
+
         for _ in range(iterations):
             start = time.perf_counter()
             # Use PSS for signing (probabilistic padding)
@@ -143,10 +147,10 @@ def benchmark_rsa(key_size, security_bits):
             )
             sign_times.append(time.perf_counter() - start)
             signatures.append(sig)
-        
+
         avg_sign = sum(sign_times) / len(sign_times) * 1000  # ms
         sig_size = len(signatures[0])
-        
+
         # Verification
         verify_times = []
         for sig in signatures:
@@ -161,15 +165,15 @@ def benchmark_rsa(key_size, security_bits):
                 hashes.SHA256()
             )
             verify_times.append(time.perf_counter() - start)
-        
+
         avg_verify = sum(verify_times) / len(verify_times) * 1000  # ms
         mem_after = get_memory_mb()
         peak_memory = max(mem_before, mem_after)
-        
+
         cpu_time = get_cpu_time()
-        
+
         print(f"✅ (Sign: {avg_sign:.2f}ms, Verify: {avg_verify:.2f}ms)")
-        
+
         return {
             'rsa_sign_ms': avg_sign,
             'rsa_verify_ms': avg_verify,
@@ -178,7 +182,7 @@ def benchmark_rsa(key_size, security_bits):
             'rsa_public_key_size': public_key_size,
             'rsa_signature_size': sig_size,
         }
-        
+
     except Exception as e:
         print(f"❌ Error: {e}")
         return None
@@ -186,52 +190,52 @@ def benchmark_rsa(key_size, security_bits):
 def benchmark_ecdsa(curve_name, security_bits):
     """Benchmark ECDSA operations"""
     print(f"   🔑 ECDSA ({curve_name})...", end=" ", flush=True)
-    
+
     try:
         iterations = ITERATIONS.get(SECURITY_LEVELS[[l['ecdsa'] for l in SECURITY_LEVELS].index(curve_name)]['rsa'], 3)
-        
+
         # Key generation
         start_keygen = time.perf_counter()
         private_key = ec.generate_private_key(CURVES[curve_name], default_backend())
         keygen_time = time.perf_counter() - start_keygen
         public_key = private_key.public_key()
-        
+
         # Key sizes
         public_pem = public_key.public_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo
         )
         public_key_size = len(public_pem)
-        
+
         # Signing
         mem_before = get_memory_mb()
         sign_times = []
         signatures = []
-        
+
         for _ in range(iterations):
             start = time.perf_counter()
             sig = private_key.sign(TEST_MESSAGE, ec.ECDSA(hashes.SHA256()))
             sign_times.append(time.perf_counter() - start)
             signatures.append(sig)
-        
+
         avg_sign = sum(sign_times) / len(sign_times) * 1000  # ms
         sig_size = len(signatures[0])
-        
+
         # Verification
         verify_times = []
         for sig in signatures:
             start = time.perf_counter()
             public_key.verify(sig, TEST_MESSAGE, ec.ECDSA(hashes.SHA256()))
             verify_times.append(time.perf_counter() - start)
-        
+
         avg_verify = sum(verify_times) / len(verify_times) * 1000  # ms
         mem_after = get_memory_mb()
         peak_memory = max(mem_before, mem_after)
-        
+
         cpu_time = get_cpu_time()
-        
+
         print(f"✅ (Sign: {avg_sign:.2f}ms, Verify: {avg_verify:.2f}ms)")
-        
+
         return {
             'ecdsa_sign_ms': avg_sign,
             'ecdsa_verify_ms': avg_verify,
@@ -240,7 +244,7 @@ def benchmark_ecdsa(curve_name, security_bits):
             'ecdsa_public_key_size': public_key_size,
             'ecdsa_signature_size': sig_size,
         }
-        
+
     except Exception as e:
         print(f"❌ Error: {e}")
         return None
@@ -251,35 +255,35 @@ def benchmark_ecdsa(curve_name, security_bits):
 
 def run_benchmark():
     """Run comprehensive benchmark"""
-    
+
     print("=" * 80)
-    print("🔐 COMPREHENSIVE ECDSA vs RSA-OAEP Benchmark")
+    print("🔐 COMPREHENSIVE ECDSA vs RSA-PSS Benchmark")
     print("=" * 80)
     print(f"Started: {datetime.now()}\n")
-    
+
     results = []
-    
+
     for level in SECURITY_LEVELS:
         bits = level['bits']
         rsa_size = level['rsa']
         ecdsa_curve = level['ecdsa']
-        
+
         print(f"🔑 Security Level: {bits}-bit")
         print(f"   RSA: {rsa_size}-bit | ECDSA: {ecdsa_curve}")
         print(f"   {level['notes']}")
         print(f"   {'─'*76}")
-        
+
         # RSA benchmark
         rsa_result = benchmark_rsa(rsa_size, bits)
-        
+
         # ECDSA benchmark
         ecdsa_result = benchmark_ecdsa(ecdsa_curve, bits)
-        
+
         if rsa_result and ecdsa_result:
             # Calculate ratios
             sign_ratio = rsa_result['rsa_sign_ms'] / ecdsa_result['ecdsa_sign_ms']
             verify_ratio = rsa_result['rsa_verify_ms'] / ecdsa_result['ecdsa_verify_ms']
-            
+
             result_row = {
                 'security_bits': bits,
                 'rsa_key_size': rsa_size,
@@ -301,9 +305,9 @@ def run_benchmark():
                 'verify_ratio_rsa_ecdsa': round(verify_ratio, 2),
             }
             results.append(result_row)
-        
+
         print()
-    
+
     return results
 
 # ============================================================================
@@ -313,18 +317,18 @@ def run_benchmark():
 def save_results(results):
     """Save results to CSV"""
     OUTPUT_DIR.mkdir(exist_ok=True)
-    
+
     with open(CSV_PATH, 'w', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=results[0].keys())
         writer.writeheader()
         writer.writerows(results)
-    
+
     print(f"✅ CSV saved: {CSV_PATH}\n")
 
 def generate_graphs(results):
-    """Generate 6 comparison graphs"""
+    """Generate comparison graphs + verification-time transaction scaling"""
     GRAPHS_DIR.mkdir(exist_ok=True)
-    
+
     security_bits = [r['security_bits'] for r in results]
     rsa_sign = [r['rsa_sign_ms'] for r in results]
     ecdsa_sign = [r['ecdsa_sign_ms'] for r in results]
@@ -338,13 +342,13 @@ def generate_graphs(results):
     ecdsa_key = [r['ecdsa_public_key_size'] / 1024 for r in results]
     rsa_sig = [r['rsa_signature_size'] for r in results]
     ecdsa_sig = [r['ecdsa_signature_size'] for r in results]
-    
+
     x = range(len(security_bits))
     width = 0.35
-    
+
     # 1. Signing Time
     plt.figure(figsize=(12, 6))
-    plt.bar([i - width/2 for i in x], rsa_sign, width, label='RSA-OAEP', alpha=0.8)
+    plt.bar([i - width/2 for i in x], rsa_sign, width, label='RSA-PSS', alpha=0.8)
     plt.bar([i + width/2 for i in x], ecdsa_sign, width, label='ECDSA', alpha=0.8)
     plt.xlabel('Security Level (bits)')
     plt.ylabel('Sign Time (ms)')
@@ -356,25 +360,25 @@ def generate_graphs(results):
     plt.savefig(GRAPHS_DIR / 'signing_time.png', dpi=150)
     plt.close()
     print("✅ signing_time.png")
-    
-    # 2. Verification Time
+
+    # 2. Verification Time (single-op)
     plt.figure(figsize=(12, 6))
-    plt.bar([i - width/2 for i in x], rsa_verify, width, label='RSA-OAEP', alpha=0.8)
+    plt.bar([i - width/2 for i in x], rsa_verify, width, label='RSA-PSS', alpha=0.8)
     plt.bar([i + width/2 for i in x], ecdsa_verify, width, label='ECDSA', alpha=0.8)
     plt.xlabel('Security Level (bits)')
     plt.ylabel('Verify Time (ms)')
-    plt.title('Verification Time Comparison')
+    plt.title('Verification Time Comparison (Single Operation)')
     plt.xticks(x, security_bits)
     plt.legend()
     plt.grid(axis='y', alpha=0.3)
     plt.tight_layout()
-    plt.savefig(GRAPHS_DIR / 'verification_time.png', dpi=150)
+    plt.savefig(GRAPHS_DIR / 'verification_time_single.png', dpi=150)
     plt.close()
-    print("✅ verification_time.png")
-    
+    print("✅ verification_time_single.png")
+
     # 3. CPU Time
     plt.figure(figsize=(12, 6))
-    plt.bar([i - width/2 for i in x], rsa_cpu, width, label='RSA-OAEP', alpha=0.8)
+    plt.bar([i - width/2 for i in x], rsa_cpu, width, label='RSA-PSS', alpha=0.8)
     plt.bar([i + width/2 for i in x], ecdsa_cpu, width, label='ECDSA', alpha=0.8)
     plt.xlabel('Security Level (bits)')
     plt.ylabel('CPU Time (s)')
@@ -386,10 +390,10 @@ def generate_graphs(results):
     plt.savefig(GRAPHS_DIR / 'cpu_time.png', dpi=150)
     plt.close()
     print("✅ cpu_time.png")
-    
+
     # 4. Memory Usage
     plt.figure(figsize=(12, 6))
-    plt.bar([i - width/2 for i in x], rsa_mem, width, label='RSA-OAEP', alpha=0.8)
+    plt.bar([i - width/2 for i in x], rsa_mem, width, label='RSA-PSS', alpha=0.8)
     plt.bar([i + width/2 for i in x], ecdsa_mem, width, label='ECDSA', alpha=0.8)
     plt.xlabel('Security Level (bits)')
     plt.ylabel('Peak Memory (MB)')
@@ -401,10 +405,10 @@ def generate_graphs(results):
     plt.savefig(GRAPHS_DIR / 'memory_usage.png', dpi=150)
     plt.close()
     print("✅ memory_usage.png")
-    
+
     # 5. Public Key Size
     plt.figure(figsize=(12, 6))
-    plt.bar([i - width/2 for i in x], rsa_key, width, label='RSA-OAEP', alpha=0.8)
+    plt.bar([i - width/2 for i in x], rsa_key, width, label='RSA-PSS', alpha=0.8)
     plt.bar([i + width/2 for i in x], ecdsa_key, width, label='ECDSA', alpha=0.8)
     plt.xlabel('Security Level (bits)')
     plt.ylabel('Key Size (KB)')
@@ -416,10 +420,10 @@ def generate_graphs(results):
     plt.savefig(GRAPHS_DIR / 'key_size.png', dpi=150)
     plt.close()
     print("✅ key_size.png")
-    
+
     # 6. Signature Size
     plt.figure(figsize=(12, 6))
-    plt.bar([i - width/2 for i in x], rsa_sig, width, label='RSA-OAEP', alpha=0.8)
+    plt.bar([i - width/2 for i in x], rsa_sig, width, label='RSA-PSS', alpha=0.8)
     plt.bar([i + width/2 for i in x], ecdsa_sig, width, label='ECDSA', alpha=0.8)
     plt.xlabel('Security Level (bits)')
     plt.ylabel('Signature Size (bytes)')
@@ -431,7 +435,52 @@ def generate_graphs(results):
     plt.savefig(GRAPHS_DIR / 'signature_size.png', dpi=150)
     plt.close()
     print("✅ signature_size.png")
-    
+
+    # 7. Verification Time (Transaction Scaling) + Ratio
+    verify_ratios = [r['verify_ratio_rsa_ecdsa'] for r in results]
+    for tx_count in TRANSACTION_COUNTS:
+        rsa_verify_total = [v * tx_count for v in rsa_verify]  # ms
+        ecdsa_verify_total = [v * tx_count for v in ecdsa_verify]  # ms
+
+        fig, ax1 = plt.subplots(figsize=(12, 6))
+        ax1.bar([i - width/2 for i in x], rsa_verify_total, width, label='RSA-PSS', alpha=0.8)
+        ax1.bar([i + width/2 for i in x], ecdsa_verify_total, width, label='ECDSA', alpha=0.8)
+        ax1.set_xlabel('Security Level (bits)')
+        ax1.set_ylabel('Total Verify Time (ms)')
+        ax1.set_title(f'Verification Time for {tx_count:,} Transactions')
+        ax1.set_xticks(list(x))
+        ax1.set_xticklabels(security_bits)
+        ax1.grid(axis='y', alpha=0.3)
+
+        ax2 = ax1.twinx()
+        ax2.plot(list(x), verify_ratios, color='black', marker='o', label='RSA/ECDSA Ratio')
+        ax2.set_ylabel('Verify Time Ratio (RSA / ECDSA)')
+
+        lines_1, labels_1 = ax1.get_legend_handles_labels()
+        lines_2, labels_2 = ax2.get_legend_handles_labels()
+        ax1.legend(lines_1 + lines_2, labels_1 + labels_2, loc='upper left')
+
+        plt.tight_layout()
+        fname = GRAPHS_DIR / f'verification_time_{tx_count//1000}k.png'
+        plt.savefig(fname, dpi=150)
+        plt.close()
+        print(f"✅ {fname.name}")
+
+    # 8. Verification Ratio Summary (across transaction counts)
+    plt.figure(figsize=(12, 6))
+    for tx_count in TRANSACTION_COUNTS:
+        plt.plot(security_bits, verify_ratios, marker='o', label=f'{tx_count//1000}k tx')
+    plt.xlabel('Security Level (bits)')
+    plt.ylabel('Verify Time Ratio (RSA / ECDSA)')
+    plt.title('Verification Time Ratio Across Security Levels (All Tx Counts)')
+    plt.xticks(security_bits)
+    plt.grid(axis='y', alpha=0.3)
+    plt.legend(ncol=3)
+    plt.tight_layout()
+    plt.savefig(GRAPHS_DIR / 'verification_ratio_summary.png', dpi=150)
+    plt.close()
+    print("✅ verification_ratio_summary.png")
+
     print(f"\n✅ All graphs saved to: {GRAPHS_DIR}\n")
 
 def print_summary(results):
@@ -439,7 +488,7 @@ def print_summary(results):
     print("=" * 80)
     print("📊 BENCHMARK RESULTS SUMMARY")
     print("=" * 80 + "\n")
-    
+
     for r in results:
         print(f"🔐 Security {r['security_bits']}-bit: RSA-{r['rsa_key_size']} vs ECDSA-{r['ecdsa_curve']}")
         print(f"   {r['notes']}")
@@ -461,21 +510,21 @@ def print_summary(results):
 
 if __name__ == '__main__':
     print(f"\n⏱️  Starting benchmark at {datetime.now()}\n")
-    
+
     # Run benchmark
     results = run_benchmark()
-    
+
     if results:
         # Save CSV
         save_results(results)
-        
+
         # Generate graphs
         print("📊 Generating graphs...")
         generate_graphs(results)
-        
+
         # Print summary
         print_summary(results)
-        
+
         print("=" * 80)
         print(f"✅ Benchmark complete at {datetime.now()}")
         print(f"   CSV: {CSV_PATH}")
