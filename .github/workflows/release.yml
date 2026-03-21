@@ -3,6 +3,10 @@ name: Build & Release Benchmark Results
 on:
   workflow_dispatch:
 
+concurrency:
+  group: release-results-master
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -44,11 +48,33 @@ jobs:
 
       - name: Commit release artifacts into results/
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           git add results/
-          git commit -m "chore: store release ${RELEASE_TAG} results" || echo "No changes to commit"
-          git push
+          git commit -m "chore: store release ${RELEASE_TAG} results" || {
+            echo "No changes to commit"
+            exit 0
+          }
+
+          # Sync with remote to avoid non-fast-forward failures
+          git fetch origin master
+          git rebase origin/master
+
+          # Push; if another run wins the race, rebase and retry a few times
+          for i in 1 2 3 4 5; do
+            if git push origin HEAD:master; then
+              exit 0
+            fi
+            echo "Push failed (attempt $i). Rebasing onto latest origin/master and retrying..."
+            git fetch origin master
+            git rebase origin/master
+            sleep $((i * 2))
+          done
+
+          echo "Push failed after retries"
+          exit 1
 
       - name: Upload results as workflow artifacts
         uses: actions/upload-artifact@v4
