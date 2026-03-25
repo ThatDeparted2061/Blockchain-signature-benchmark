@@ -70,13 +70,17 @@ CURVES = {
     'P-521': ec.SECP521R1(),
 }
 
-# For large RSA keys, reduce iterations
-ITERATIONS = {
-    2048: 3,
-    3072: 3,
-    7680: 3,
-    15360: 1,  # Large keys: 1 iteration
-    30720: 1,  # Ultra-large: 1 iteration only
+# Warmup and timed iterations tuned per RSA-equivalent level
+WARMUP_ITERATIONS = {
+    2048: 20,
+    3072: 20,
+    7680: 10,
+}
+
+TIMED_ITERATIONS = {
+    2048: 200,
+    3072: 200,
+    7680: 100,
 }
 
 TEST_MESSAGE = b"Blockchain transaction data for signing and verification benchmark"
@@ -104,7 +108,21 @@ def get_cpu_time():
     """Get current process CPU time in seconds"""
     try:
         process = psutil.Process(os.getpid())
-        return process.cpu_num() if hasattr(process, 'cpu_num') else 0
+        cpu_times = process.cpu_times()
+        return cpu_times.user + cpu_times.system
+    except:
+        return 0
+
+def measure_batch_verification(verify_fn, tx_count):
+    """Measure total verification time (ms) for tx_count operations."""
+    try:
+        warmup = min(10, tx_count)
+        for _ in range(warmup):
+            verify_fn()
+        start = time.perf_counter()
+        for _ in range(tx_count):
+            verify_fn()
+        return (time.perf_counter() - start) * 1000
     except:
         return 0
 
@@ -117,7 +135,10 @@ def benchmark_rsa(key_size, security_bits):
     print(f"   🔓 RSA-PSS ({key_size}-bit)...", end=" ", flush=True)
 
     try:
-        iterations = ITERATIONS.get(key_size, 1)
+        warmup_iterations = WARMUP_ITERATIONS.get(key_size, 5)
+        timed_iterations = TIMED_ITERATIONS.get(key_size, 20)
+        mem_before = get_memory_mb()
+        cpu_before = get_cpu_time()
 
         # Key generation
         start_keygen = time.perf_counter()
@@ -137,11 +158,20 @@ def benchmark_rsa(key_size, security_bits):
         public_key_size = len(public_pem)
 
         # Signing
-        mem_before = get_memory_mb()
         sign_times = []
         signatures = []
 
-        for _ in range(iterations):
+        for _ in range(warmup_iterations):
+            private_key.sign(
+                TEST_MESSAGE,
+                padding.PSS(
+                    mgf=padding.MGF1(hashes.SHA256()),
+                    salt_length=padding.PSS.MAX_LENGTH
+                ),
+                hashes.SHA256()
+            )
+
+        for _ in range(timed_iterations):
             start = time.perf_counter()
             # Use PSS for signing (probabilistic padding)
             sig = private_key.sign(
@@ -160,6 +190,17 @@ def benchmark_rsa(key_size, security_bits):
 
         # Verification
         verify_times = []
+        for sig in signatures[:warmup_iterations]:
+            public_key.verify(
+                sig,
+                TEST_MESSAGE,
+                padding.PSS(
+                    mgf=padding.MGF1(hashes.SHA256()),
+                    salt_length=padding.PSS.MAX_LENGTH
+                ),
+                hashes.SHA256()
+            )
+
         for sig in signatures:
             start = time.perf_counter()
             public_key.verify(
@@ -175,31 +216,48 @@ def benchmark_rsa(key_size, security_bits):
 
         avg_verify = sum(verify_times) / len(verify_times) * 1000  # ms
         mem_after = get_memory_mb()
-        peak_memory = max(mem_before, mem_after)
+        mem_delta = max(mem_after - mem_before, 0)
 
-        cpu_time = get_cpu_time()
+        cpu_time = max(get_cpu_time() - cpu_before, 0)
 
         print(f"✅ (Sign: {avg_sign:.2f}ms, Verify: {avg_verify:.2f}ms)")
+
+        sample_signature = signatures[0]
+
+        def verify_fn():
+            public_key.verify(
+                sample_signature,
+                TEST_MESSAGE,
+                padding.PSS(
+                    mgf=padding.MGF1(hashes.SHA256()),
+                    salt_length=padding.PSS.MAX_LENGTH
+                ),
+                hashes.SHA256()
+            )
 
         return {
             'rsa_sign_ms': avg_sign,
             'rsa_verify_ms': avg_verify,
             'rsa_cpu_time': cpu_time,
-            'rsa_memory_mb': peak_memory,
+            'rsa_memory_mb': mem_delta,
             'rsa_public_key_size': public_key_size,
             'rsa_signature_size': sig_size,
+            'rsa_verify_fn': verify_fn,
         }
 
     except Exception as e:
         print(f"❌ Error: {e}")
         return None
 
-def benchmark_ecdsa(curve_name, security_bits):
+def benchmark_ecdsa(curve_name, security_bits, rsa_key_size):
     """Benchmark ECDSA operations"""
     print(f"   🔑 ECDSA ({curve_name})...", end=" ", flush=True)
 
     try:
-        iterations = ITERATIONS.get(SECURITY_LEVELS[[l['ecdsa'] for l in SECURITY_LEVELS].index(curve_name)]['rsa'], 3)
+        warmup_iterations = WARMUP_ITERATIONS.get(rsa_key_size, 5)
+        timed_iterations = TIMED_ITERATIONS.get(rsa_key_size, 20)
+        mem_before = get_memory_mb()
+        cpu_before = get_cpu_time()
 
         # Key generation
         start_keygen = time.perf_counter()
@@ -215,11 +273,13 @@ def benchmark_ecdsa(curve_name, security_bits):
         public_key_size = len(public_pem)
 
         # Signing
-        mem_before = get_memory_mb()
         sign_times = []
         signatures = []
 
-        for _ in range(iterations):
+        for _ in range(warmup_iterations):
+            private_key.sign(TEST_MESSAGE, ec.ECDSA(hashes.SHA256()))
+
+        for _ in range(timed_iterations):
             start = time.perf_counter()
             sig = private_key.sign(TEST_MESSAGE, ec.ECDSA(hashes.SHA256()))
             sign_times.append(time.perf_counter() - start)
@@ -230,6 +290,9 @@ def benchmark_ecdsa(curve_name, security_bits):
 
         # Verification
         verify_times = []
+        for sig in signatures[:warmup_iterations]:
+            public_key.verify(sig, TEST_MESSAGE, ec.ECDSA(hashes.SHA256()))
+
         for sig in signatures:
             start = time.perf_counter()
             public_key.verify(sig, TEST_MESSAGE, ec.ECDSA(hashes.SHA256()))
@@ -237,19 +300,25 @@ def benchmark_ecdsa(curve_name, security_bits):
 
         avg_verify = sum(verify_times) / len(verify_times) * 1000  # ms
         mem_after = get_memory_mb()
-        peak_memory = max(mem_before, mem_after)
+        mem_delta = max(mem_after - mem_before, 0)
 
-        cpu_time = get_cpu_time()
+        cpu_time = max(get_cpu_time() - cpu_before, 0)
 
         print(f"✅ (Sign: {avg_sign:.2f}ms, Verify: {avg_verify:.2f}ms)")
+
+        sample_signature = signatures[0]
+
+        def verify_fn():
+            public_key.verify(sample_signature, TEST_MESSAGE, ec.ECDSA(hashes.SHA256()))
 
         return {
             'ecdsa_sign_ms': avg_sign,
             'ecdsa_verify_ms': avg_verify,
             'ecdsa_cpu_time': cpu_time,
-            'ecdsa_memory_mb': peak_memory,
+            'ecdsa_memory_mb': mem_delta,
             'ecdsa_public_key_size': public_key_size,
             'ecdsa_signature_size': sig_size,
+            'ecdsa_verify_fn': verify_fn,
         }
 
     except Exception as e:
@@ -269,6 +338,7 @@ def run_benchmark():
     print(f"Started: {datetime.now()}\n")
 
     results = []
+    batch_results = []
 
     for level in SECURITY_LEVELS:
         bits = level['bits']
@@ -284,7 +354,7 @@ def run_benchmark():
         rsa_result = benchmark_rsa(rsa_size, bits)
 
         # ECDSA benchmark
-        ecdsa_result = benchmark_ecdsa(ecdsa_curve, bits)
+        ecdsa_result = benchmark_ecdsa(ecdsa_curve, bits, rsa_size)
 
         if rsa_result and ecdsa_result:
             # Calculate ratios
@@ -313,9 +383,21 @@ def run_benchmark():
             }
             results.append(result_row)
 
+            for tx_count in TRANSACTION_COUNTS:
+                rsa_batch_total = measure_batch_verification(rsa_result['rsa_verify_fn'], tx_count)
+                ecdsa_batch_total = measure_batch_verification(ecdsa_result['ecdsa_verify_fn'], tx_count)
+                verify_ratio_batch = rsa_batch_total / ecdsa_batch_total if ecdsa_batch_total else 0
+                batch_results.append({
+                    'security_bits': bits,
+                    'tx_count': tx_count,
+                    'rsa_verify_total_ms': rsa_batch_total,
+                    'ecdsa_verify_total_ms': ecdsa_batch_total,
+                    'verify_ratio_rsa_ecdsa': verify_ratio_batch,
+                })
+
         print()
 
-    return results
+    return results, batch_results
 
 # ============================================================================
 # SAVE & GRAPH
@@ -332,7 +414,7 @@ def save_results(results):
 
     print(f"✅ CSV saved: {CSV_PATH}\n")
 
-def generate_graphs(results):
+def generate_graphs(results, batch_results):
     """Generate comparison graphs + verification-time transaction scaling"""
     GRAPHS_DIR.mkdir(exist_ok=True)
 
@@ -444,10 +526,14 @@ def generate_graphs(results):
     print("✅ signature_size.png")
 
     # 7. Verification Time (Transaction Scaling) + Ratio
-    verify_ratios = [r['verify_ratio_rsa_ecdsa'] for r in results]
     for tx_count in TRANSACTION_COUNTS:
-        rsa_verify_total = [v * tx_count for v in rsa_verify]  # ms
-        ecdsa_verify_total = [v * tx_count for v in ecdsa_verify]  # ms
+        tx_rows = sorted(
+            [row for row in batch_results if row['tx_count'] == tx_count],
+            key=lambda row: row['security_bits']
+        )
+        rsa_verify_total = [row['rsa_verify_total_ms'] for row in tx_rows]
+        ecdsa_verify_total = [row['ecdsa_verify_total_ms'] for row in tx_rows]
+        verify_ratios = [row['verify_ratio_rsa_ecdsa'] for row in tx_rows]
 
         fig, ax1 = plt.subplots(figsize=(10, 5.5))
         ax1.bar([i - width/2 for i in x], rsa_verify_total, width, label='RSA-PSS', alpha=0.9, color='#4C78A8')
@@ -476,7 +562,12 @@ def generate_graphs(results):
     # 8. Verification Ratio Summary (across transaction counts)
     plt.figure(figsize=(10, 5.5))
     for tx_count in TRANSACTION_COUNTS:
-        plt.plot(security_bits, verify_ratios, marker='o', label=f'{tx_count//1000}k tx')
+        tx_rows = sorted(
+            [row for row in batch_results if row['tx_count'] == tx_count],
+            key=lambda row: row['security_bits']
+        )
+        ratios = [row['verify_ratio_rsa_ecdsa'] for row in tx_rows]
+        plt.plot(security_bits, ratios, marker='o', label=f'{tx_count//1000}k tx')
     plt.xlabel('Security Level (bits)')
     plt.ylabel('Verify Time Ratio (RSA / ECDSA)')
     plt.title('Verification Time Ratio Across Security Levels (All Tx Counts)')
@@ -519,7 +610,7 @@ if __name__ == '__main__':
     print(f"\n⏱️  Starting benchmark at {datetime.now()}\n")
 
     # Run benchmark
-    results = run_benchmark()
+    results, batch_results = run_benchmark()
 
     if results:
         # Save CSV
@@ -527,7 +618,7 @@ if __name__ == '__main__':
 
         # Generate graphs
         print("📊 Generating graphs...")
-        generate_graphs(results)
+        generate_graphs(results, batch_results)
 
         # Print summary
         print_summary(results)

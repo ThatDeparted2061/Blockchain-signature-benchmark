@@ -50,7 +50,8 @@ python3 benchmark_complete.py
 ## Metrics Reported
 
 - Signing and verification time
-- CPU and memory usage
+- CPU time consumed by the benchmark process (user + system, delta per algorithm)
+- Memory delta during benchmarked operations (MB, baseline-subtracted)
 - Key and signature sizes
 - Ratios for performance comparisons (RSA/ECDSA)
 
@@ -59,6 +60,7 @@ python3 benchmark_complete.py
 - RSA signing uses RSASSA-PSS for secure, probabilistic signatures.
 - No other .py benchmarking scripts are needed—`benchmark_complete.py` replaces prior scripts for clarity.
 - For lab or CI runs, expect longer runtimes for ultra-large keys (RSA 15360/30720 bits).
+- Verification-ratio summary is computed from measured batch verification runs per transaction count (not from constant single-op scaling).
 
 ## Cleaning Up
 
