@@ -32,63 +32,70 @@ jobs:
 
       - name: Run benchmark
         run: |
-          mkdir -p results
+          mkdir -p results/graphs
           python3 benchmark_complete.py
 
-      - name: Prepare release folder in results/
+      - name: Prepare release folder
         run: |
           RELEASE_TAG=benchmark-${{ github.run_number }}
           RELEASE_DIR=results/${RELEASE_TAG}
-          mkdir -p "${RELEASE_DIR}"
-          shopt -s dotglob
-          cp -r results/* "${RELEASE_DIR}/" || true
-          shopt -u dotglob
-          echo "RELEASE_TAG=${RELEASE_TAG}" >> $GITHUB_ENV
-          echo "RELEASE_DIR=${RELEASE_DIR}" >> $GITHUB_ENV
+          mkdir -p "${RELEASE_DIR}/graphs"
+
+          # Copy CSVs and graphs explicitly so RELEASE_DIR is never copied into itself.
+          find results -maxdepth 1 -name "*.csv" -exec cp {} "${RELEASE_DIR}/" \;
+          find results/graphs -maxdepth 1 -name "*.png" \
+            -exec cp {} "${RELEASE_DIR}/graphs/" \; 2>/dev/null || true
+
+          echo "RELEASE_TAG=${RELEASE_TAG}" >> "$GITHUB_ENV"
+          echo "RELEASE_DIR=${RELEASE_DIR}" >> "$GITHUB_ENV"
 
       - name: Commit release artifacts into results/
         run: |
           set -euo pipefail
-          git config user.name "github-actions[bot]"
+          git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add results/
-          git commit -m "chore: store release ${RELEASE_TAG} results" || {
-            echo "No changes to commit"
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: store benchmark results ${RELEASE_TAG}"
+          else
+            echo "No changes to commit — skipping."
             exit 0
-          }
+          fi
 
-          # Sync with remote to avoid non-fast-forward failures
+          # Sync with remote to avoid non-fast-forward failures.
           git fetch origin master
           git rebase origin/master
 
-          # Push; if another run wins the race, rebase and retry a few times
+          # Retry push a few times in case of concurrent runs.
           for i in 1 2 3 4 5; do
             if git push origin HEAD:master; then
               exit 0
             fi
-            echo "Push failed (attempt $i). Rebasing onto latest origin/master and retrying..."
+            echo "Push failed (attempt ${i}/5). Rebasing and retrying…"
             git fetch origin master
             git rebase origin/master
             sleep $((i * 2))
           done
 
-          echo "Push failed after retries"
+          echo "❌ Push failed after 5 attempts."
           exit 1
 
-      - name: Upload results as workflow artifacts
+      - name: Upload results as workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-results-${{ env.RELEASE_TAG }}
           path: ${{ env.RELEASE_DIR }}/
+          if-no-files-found: error
 
       - name: Create GitHub Release
-        id: create_release
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ env.RELEASE_TAG }}
           name: Benchmark Results #${{ github.run_number }}
           generateReleaseNotes: true
-          artifacts: ${{ env.RELEASE_DIR }}/**
+          artifacts: >
+            ${{ env.RELEASE_DIR }}/*.csv,
+            ${{ env.RELEASE_DIR }}/graphs/*.png
           allowUpdates: true
           replacesArtifacts: true
