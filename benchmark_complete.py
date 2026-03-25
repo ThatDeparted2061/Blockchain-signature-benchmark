@@ -58,7 +58,7 @@ except ImportError:
 # ============================================================================
 
 SECURITY_LEVELS = [
-    {'bits': 112, 'rsa': 2048, 'ecdsa': 'secp224r1', 'notes': 'secp256k1 stronger (~128-bit)'},
+    {'bits': 112, 'rsa': 2048, 'ecdsa': 'secp224r1', 'notes': 'secp224r1 baseline (secp256k1 is stronger, ~128-bit)'},
     {'bits': 128, 'rsa': 3072, 'ecdsa': 'P-256', 'notes': 'Modern standard baseline'},
     {'bits': 192, 'rsa': 7680, 'ecdsa': 'P-384', 'notes': 'High security'},
 ]

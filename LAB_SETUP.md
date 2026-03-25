@@ -104,10 +104,10 @@ SECURITY_LEVELS = [
 ## Example Output
 
 ```
-🔐 Security Level: 192-bit
+   🔐 Security Level: 192-bit
    RSA: 7680-bit | ECDSA: P-384
    High security
-   ────────────────────────────────────────────────────────────────────────────
+   ----
    🔓 RSA-PSS (7680-bit)... ✅ (Sign: 42.29ms, Verify: 0.29ms)
    🔑 ECDSA (P-384)... ✅ (Sign: 0.93ms, Verify: 0.77ms)
 ```
