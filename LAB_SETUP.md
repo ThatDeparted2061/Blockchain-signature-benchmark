@@ -28,7 +28,7 @@ python3 benchmark_complete.py
 results/benchmark_results_comprehensive.csv
 ```
 
-**6 Graphs:**
+**Graphs:**
 ```
 results/graphs/
 ├── signing_time.png
@@ -47,8 +47,8 @@ results/graphs/
 |---|---|
 | **Sign Time** | Average signing time (ms) |
 | **Verify Time** | Average verification time (ms) |
-| **CPU Time** | Total CPU consumed (seconds) |
-| **Memory** | Peak memory usage (MB) |
+| **CPU Time** | CPU consumed during each algorithm benchmark (user + system seconds) |
+| **Memory** | Memory delta during each benchmarked operation set (MB) |
 | **Public Key Size** | Key size in bytes |
 | **Signature Size** | Signature size in bytes |
 
@@ -61,8 +61,6 @@ results/graphs/
 | 112-bit | 2048 | secp224r1 | Basic |
 | 128-bit | 3072 | P-256 | Standard |
 | 192-bit | 7680 | P-384 | High |
-| 256-bit | 15360 | P-521 | Very High |
-| 512-bit | 30720 | P-521 | Ultra-Secure |
 
 ---
 
@@ -106,12 +104,12 @@ SECURITY_LEVELS = [
 ## Example Output
 
 ```
-🔐 Security Level: 512-bit
-   RSA: 30720-bit | ECDSA: P-521
-   Ultra-high security
-   ────────────────────────────────────────────────────────────────────────────
-   🔓 RSA-OAEP (30720-bit)... ✅ (Sign: 1250.45ms, Verify: 8.23ms)
-   🔑 ECDSA (P-521)... ✅ (Sign: 0.34ms, Verify: 0.45ms)
+   🔐 Security Level: 192-bit
+   RSA: 7680-bit | ECDSA: P-384
+   High security
+   ----
+   🔓 RSA-PSS (7680-bit)... ✅ (Sign: 42.29ms, Verify: 0.29ms)
+   🔑 ECDSA (P-384)... ✅ (Sign: 0.93ms, Verify: 0.77ms)
 ```
 
 ---
@@ -123,7 +121,7 @@ After running, commit to GitHub:
 ```bash
 cd /path/to/Blockchain-signature-benchmark
 git add results/benchmark_results_comprehensive.csv results/graphs/*
-git commit -m "Benchmark: Complete ECDSA vs RSA-OAEP (5 security levels, all metrics)"
+git commit -m "Benchmark: Complete ECDSA vs RSA-PSS (3 security levels, all metrics)"
 git push origin master
 ```
 
