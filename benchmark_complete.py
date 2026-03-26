@@ -3,14 +3,14 @@
 COMPREHENSIVE ECDSA vs Probabilistic RSA-PSS Benchmark
 =======================================================
 Full cryptographic performance comparison across 3 matched security levels.
-Generates CSV results + matplotlib graphs including batch-verification
+Generates CSV results + Seaborn graphs including batch-verification
 throughput with milestone-based measurement and a ratio summary.
 
 USAGE:
     python3 benchmark_complete.py
 
 REQUIREMENTS:
-    pip install cryptography matplotlib psutil
+    pip install cryptography matplotlib seaborn psutil
 
 OUTPUT:
     results/benchmark_results_comprehensive.csv
@@ -36,21 +36,24 @@ from cryptography.hazmat.primitives.asymmetric import ec, padding, rsa
 try:
     import matplotlib
     import matplotlib.pyplot as plt
+    import pandas as pd
+    import seaborn as sns
 
     matplotlib.use("Agg")
-    plt.style.use("seaborn-v0_8")
-    matplotlib.rcParams.update(
-        {
+    sns.set_theme(
+        style="whitegrid",
+        palette="muted",
+        rc={
             "figure.dpi": 150,
-            "axes.titlesize": 14,
-            "axes.labelsize": 12,
-            "legend.fontsize": 10,
-            "xtick.labelsize": 10,
-            "ytick.labelsize": 10,
-        }
+            "axes.titlesize": 16,
+            "axes.labelsize": 13,
+            "legend.fontsize": 11,
+            "xtick.labelsize": 11,
+            "ytick.labelsize": 11,
+        },
     )
 except ImportError:
-    print("❌ matplotlib not found. Install with: pip install matplotlib")
+    print("❌ plotting dependencies not found. Install with: pip install matplotlib seaborn pandas")
     sys.exit(1)
 
 
@@ -516,7 +519,7 @@ def save_results(results: list[dict], batch_results: list[dict]) -> None:
 
 def _bar_pair(
     ax,
-    x: list,
+    x,
     rsa_vals: list,
     ecdsa_vals: list,
     ylabel: str,
@@ -526,35 +529,49 @@ def _bar_pair(
     rsa_errs: list | None = None,
     ecdsa_errs: list | None = None,
 ) -> None:
-    """Shared helper: side-by-side bars with optional error caps."""
-    capsize = 4 if (rsa_errs or ecdsa_errs) else 0
-    ax.bar(
-        [i - width / 2 for i in x],
-        rsa_vals,
-        width,
-        label="RSA-PSS",
-        color="#4C78A8",
-        alpha=0.9,
-        yerr=rsa_errs,
-        capsize=capsize,
+    """Shared helper: side-by-side Seaborn bars with optional error caps."""
+    _ = (x, width)
+    hue_order = ["RSA-PSS", "ECDSA"]
+    df = pd.DataFrame(
+        {
+            "security_bits": security_bits * 2,
+            "algorithm": [hue_order[0]] * len(security_bits) + [hue_order[1]] * len(security_bits),
+            "value": rsa_vals + ecdsa_vals,
+        }
     )
-    ax.bar(
-        [i + width / 2 for i in x],
-        ecdsa_vals,
-        width,
-        label="ECDSA",
-        color="#F58518",
-        alpha=0.9,
-        yerr=ecdsa_errs,
-        capsize=capsize,
+
+    sns.barplot(
+        data=df,
+        x="security_bits",
+        y="value",
+        hue="algorithm",
+        hue_order=hue_order,
+        errorbar=None,
+        ax=ax,
     )
+
+    if rsa_errs or ecdsa_errs:
+        err_sets = [rsa_errs or [0.0] * len(security_bits), ecdsa_errs or [0.0] * len(security_bits)]
+        for container, errs in zip(ax.containers[:2], err_sets):
+            centers = [bar.get_x() + (bar.get_width() / 2) for bar in container]
+            heights = [bar.get_height() for bar in container]
+            ax.errorbar(
+                centers,
+                heights,
+                yerr=errs,
+                fmt="none",
+                ecolor="black",
+                elinewidth=1,
+                capsize=4,
+                capthick=1,
+                zorder=3,
+            )
+
     ax.set_xlabel("Security Level (bits)")
     ax.set_ylabel(ylabel)
     ax.set_title(title)
-    ax.set_xticks(x)
-    ax.set_xticklabels(security_bits)
-    ax.legend(frameon=True)
-    ax.grid(axis="y", alpha=0.25)
+    ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1.0), frameon=True, borderaxespad=0)
+    sns.despine(ax=ax, top=True, right=True)
 
 
 def generate_graphs(results: list[dict], batch_results: list[dict]) -> None:
@@ -564,7 +581,7 @@ def generate_graphs(results: list[dict], batch_results: list[dict]) -> None:
     x = list(range(len(sec_bits)))
 
     # ── 1. Signing time (mean ± stdev error bars) ──────────────────────────
-    fig, ax = plt.subplots(figsize=(10, 5.5))
+    fig, ax = plt.subplots(figsize=(12, 6.5))
     _bar_pair(
         ax, x,
         [r["rsa_sign_mean_ms"] for r in results],
@@ -575,13 +592,13 @@ def generate_graphs(results: list[dict], batch_results: list[dict]) -> None:
         rsa_errs=[r["rsa_sign_stdev_ms"] for r in results],
         ecdsa_errs=[r["ecdsa_sign_stdev_ms"] for r in results],
     )
-    plt.tight_layout()
+    plt.tight_layout(rect=[0, 0, 0.84, 1])
     plt.savefig(GRAPHS_DIR / "signing_time.png")
     plt.close()
     print("✅  signing_time.png")
 
     # ── 2. Single-op verification time (mean ± stdev) ──────────────────────
-    fig, ax = plt.subplots(figsize=(10, 5.5))
+    fig, ax = plt.subplots(figsize=(12, 6.5))
     _bar_pair(
         ax, x,
         [r["rsa_verify_mean_ms"] for r in results],
@@ -592,13 +609,13 @@ def generate_graphs(results: list[dict], batch_results: list[dict]) -> None:
         rsa_errs=[r["rsa_verify_stdev_ms"] for r in results],
         ecdsa_errs=[r["ecdsa_verify_stdev_ms"] for r in results],
     )
-    plt.tight_layout()
+    plt.tight_layout(rect=[0, 0, 0.84, 1])
     plt.savefig(GRAPHS_DIR / "verification_time_single.png")
     plt.close()
     print("✅  verification_time_single.png")
 
     # ── 3. CPU time consumed ───────────────────────────────────────────────
-    fig, ax = plt.subplots(figsize=(10, 5.5))
+    fig, ax = plt.subplots(figsize=(12, 6.5))
     _bar_pair(
         ax, x,
         [r["rsa_cpu_time_s"] for r in results],
@@ -607,13 +624,13 @@ def generate_graphs(results: list[dict], batch_results: list[dict]) -> None:
         title="CPU Time Consumed During Sign + Verify Phase",
         security_bits=sec_bits,
     )
-    plt.tight_layout()
+    plt.tight_layout(rect=[0, 0, 0.84, 1])
     plt.savefig(GRAPHS_DIR / "cpu_time.png")
     plt.close()
     print("✅  cpu_time.png")
 
     # ── 4. Memory delta ────────────────────────────────────────────────────
-    fig, ax = plt.subplots(figsize=(10, 5.5))
+    fig, ax = plt.subplots(figsize=(12, 6.5))
     _bar_pair(
         ax, x,
         [r["rsa_memory_delta_mb"] for r in results],
@@ -622,13 +639,13 @@ def generate_graphs(results: list[dict], batch_results: list[dict]) -> None:
         title="Process RSS Increase During Benchmark Phase",
         security_bits=sec_bits,
     )
-    plt.tight_layout()
+    plt.tight_layout(rect=[0, 0, 0.84, 1])
     plt.savefig(GRAPHS_DIR / "memory_usage.png")
     plt.close()
     print("✅  memory_usage.png")
 
     # ── 5. Public key size ─────────────────────────────────────────────────
-    fig, ax = plt.subplots(figsize=(10, 5.5))
+    fig, ax = plt.subplots(figsize=(12, 6.5))
     _bar_pair(
         ax, x,
         [r["rsa_public_key_size"] / 1024 for r in results],
@@ -637,13 +654,13 @@ def generate_graphs(results: list[dict], batch_results: list[dict]) -> None:
         title="Public Key Size Comparison",
         security_bits=sec_bits,
     )
-    plt.tight_layout()
+    plt.tight_layout(rect=[0, 0, 0.84, 1])
     plt.savefig(GRAPHS_DIR / "key_size.png")
     plt.close()
     print("✅  key_size.png")
 
     # ── 6. Signature size ──────────────────────────────────────────────────
-    fig, ax = plt.subplots(figsize=(10, 5.5))
+    fig, ax = plt.subplots(figsize=(12, 6.5))
     _bar_pair(
         ax, x,
         [r["rsa_signature_size"] for r in results],
@@ -652,55 +669,79 @@ def generate_graphs(results: list[dict], batch_results: list[dict]) -> None:
         title="Signature Size Comparison",
         security_bits=sec_bits,
     )
-    plt.tight_layout()
+    plt.tight_layout(rect=[0, 0, 0.84, 1])
     plt.savefig(GRAPHS_DIR / "signature_size.png")
     plt.close()
     print("✅  signature_size.png")
 
     # ── 7. Batch verification charts (one per tx_count) ────────────────────
-    width = 0.35
     for tx_count in TRANSACTION_COUNTS:
         tx_rows = sorted(
             [row for row in batch_results if row["tx_count"] == tx_count],
             key=lambda r: r["security_bits"],
         )
-        rsa_totals = [row["rsa_verify_total_ms"] for row in tx_rows]
-        ecdsa_totals = [row["ecdsa_verify_total_ms"] for row in tx_rows]
-        ratios = [row["verify_ratio_rsa_ecdsa"] for row in tx_rows]
         row_bits = [row["security_bits"] for row in tx_rows]
-        xi = list(range(len(row_bits)))
-
-        fig, ax1 = plt.subplots(figsize=(10, 5.5))
-        ax1.bar(
-            [i - width / 2 for i in xi], rsa_totals, width,
-            label="RSA-PSS", alpha=0.9, color="#4C78A8",
+        df_tx = pd.DataFrame(
+            {
+                "security_bits": row_bits * 2,
+                "algorithm": ["RSA-PSS"] * len(row_bits) + ["ECDSA"] * len(row_bits),
+                "total_verify_ms": [row["rsa_verify_total_ms"] for row in tx_rows]
+                + [row["ecdsa_verify_total_ms"] for row in tx_rows],
+            }
         )
-        ax1.bar(
-            [i + width / 2 for i in xi], ecdsa_totals, width,
-            label="ECDSA", alpha=0.9, color="#F58518",
+        df_ratio = pd.DataFrame(
+            {
+                "security_bits": row_bits,
+                "verify_ratio": [row["verify_ratio_rsa_ecdsa"] for row in tx_rows],
+            }
+        )
+
+        fig, ax1 = plt.subplots(figsize=(12, 6.5))
+        sns.barplot(
+            data=df_tx,
+            x="security_bits",
+            y="total_verify_ms",
+            hue="algorithm",
+            hue_order=["RSA-PSS", "ECDSA"],
+            errorbar=None,
+            ax=ax1,
         )
         ax1.set_xlabel("Security Level (bits)")
         ax1.set_ylabel("Total Verify Time (ms)")
         ax1.set_title(f"Batch Verification Time — {tx_count:,} Transactions")
-        ax1.set_xticks(xi)
-        ax1.set_xticklabels(row_bits)
-        ax1.grid(axis="y", alpha=0.25)
 
         ax2 = ax1.twinx()
-        ax2.plot(
-            xi, ratios, color="#54A24B", marker="o",
-            linewidth=2, label="RSA/ECDSA Ratio",
+        sns.lineplot(
+            data=df_ratio,
+            x="security_bits",
+            y="verify_ratio",
+            marker="o",
+            linewidth=2,
+            color="#2ca02c",
+            label="RSA/ECDSA Ratio",
+            ax=ax2,
         )
         ax2.set_ylabel("Verify Time Ratio (RSA / ECDSA)")
-        # Give the ratio line comfortable headroom above the bars
-        if ratios:
-            ax2.set_ylim(0, max(ratios) * 1.4)
+        if not df_ratio.empty:
+            ax2.set_ylim(0, df_ratio["verify_ratio"].max() * 1.4)
 
         h1, l1 = ax1.get_legend_handles_labels()
         h2, l2 = ax2.get_legend_handles_labels()
-        ax1.legend(h1 + h2, l1 + l2, loc="upper left", frameon=True)
+        ax1.legend(
+            h1 + h2,
+            l1 + l2,
+            loc="upper left",
+            bbox_to_anchor=(1.02, 1.0),
+            frameon=True,
+            borderaxespad=0,
+        )
+        if ax2.legend_ is not None:
+            ax2.legend_.remove()
 
-        plt.tight_layout()
+        sns.despine(ax=ax1, top=True, right=True)
+        sns.despine(ax=ax2, top=True, left=True)
+
+        plt.tight_layout(rect=[0, 0, 0.84, 1])
         fname = GRAPHS_DIR / f"verification_time_{tx_count // 1000}k.png"
         plt.savefig(fname)
         plt.close()
@@ -708,25 +749,39 @@ def generate_graphs(results: list[dict], batch_results: list[dict]) -> None:
 
     # ── 8. Ratio summary — lines now differ because each uses measured batch
     #       timings rather than a per-operation constant repeated N times ───
-    plt.figure(figsize=(10, 5.5))
+    summary_rows = []
     for tx_count in TRANSACTION_COUNTS:
-        tx_rows = sorted(
-            [row for row in batch_results if row["tx_count"] == tx_count],
+        for row in sorted(
+            [r for r in batch_results if r["tx_count"] == tx_count],
             key=lambda r: r["security_bits"],
-        )
-        plt.plot(
-            [row["security_bits"] for row in tx_rows],
-            [row["verify_ratio_rsa_ecdsa"] for row in tx_rows],
-            marker="o",
-            label=f"{tx_count // 1000}k tx",
-        )
-    plt.xlabel("Security Level (bits)")
-    plt.ylabel("Verify Time Ratio (RSA / ECDSA)")
-    plt.title("Batch Verification Ratio Across Security Levels (All Tx Counts)")
-    plt.xticks(sec_bits)
-    plt.grid(alpha=0.25)
-    plt.legend(ncol=3, frameon=True)
-    plt.tight_layout()
+        ):
+            summary_rows.append(
+                {
+                    "security_bits": row["security_bits"],
+                    "verify_ratio": row["verify_ratio_rsa_ecdsa"],
+                    "tx_label": f"{tx_count // 1000}k tx",
+                }
+            )
+    df_summary = pd.DataFrame(summary_rows)
+
+    fig, ax = plt.subplots(figsize=(12, 6.5))
+    sns.lineplot(
+        data=df_summary,
+        x="security_bits",
+        y="verify_ratio",
+        hue="tx_label",
+        marker="o",
+        linewidth=2,
+        ax=ax,
+    )
+    ax.set_xlabel("Security Level (bits)")
+    ax.set_ylabel("Verify Time Ratio (RSA / ECDSA)")
+    ax.set_title("Batch Verification Ratio Across Security Levels (All Tx Counts)")
+    ax.set_xticks(sec_bits)
+    ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1.0), ncol=1, frameon=True, borderaxespad=0)
+    sns.despine(ax=ax, top=True, right=True)
+
+    plt.tight_layout(rect=[0, 0, 0.84, 1])
     plt.savefig(GRAPHS_DIR / "verification_ratio_summary.png")
     plt.close()
     print("✅  verification_ratio_summary.png")

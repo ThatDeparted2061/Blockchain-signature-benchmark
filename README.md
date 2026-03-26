@@ -13,7 +13,7 @@ This project benchmarks digital signature performance between RSA (PSS, probabil
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install cryptography matplotlib psutil
+pip install cryptography matplotlib seaborn psutil
 ```
 
 ## Run the Benchmark
