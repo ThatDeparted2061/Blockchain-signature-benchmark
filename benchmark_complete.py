@@ -10,7 +10,7 @@ USAGE:
     python3 benchmark_complete.py
 
 REQUIREMENTS:
-    pip install cryptography matplotlib seaborn psutil
+    pip install cryptography matplotlib seaborn pandas psutil
 
 OUTPUT:
     results/benchmark_results_comprehensive.csv
@@ -52,8 +52,12 @@ try:
             "ytick.labelsize": 11,
         },
     )
-except ImportError:
-    print("❌ plotting dependencies not found. Install with: pip install matplotlib seaborn pandas")
+except ImportError as exc:
+    missing = getattr(exc, "name", "a plotting dependency")
+    print(
+        f"❌ Missing plotting dependency: {missing}. "
+        "Install with: pip install matplotlib seaborn pandas"
+    )
     sys.exit(1)
 
 
@@ -519,18 +523,15 @@ def save_results(results: list[dict], batch_results: list[dict]) -> None:
 
 def _bar_pair(
     ax,
-    x,
     rsa_vals: list,
     ecdsa_vals: list,
     ylabel: str,
     title: str,
     security_bits: list,
-    width: float = 0.35,
     rsa_errs: list | None = None,
     ecdsa_errs: list | None = None,
 ) -> None:
-    """Shared helper: side-by-side Seaborn bars with optional error caps."""
-    _ = (x, width)
+    """Render grouped RSA/ECDSA bars by security level with optional y-error overlays."""
     hue_order = ["RSA-PSS", "ECDSA"]
     df = pd.DataFrame(
         {
@@ -551,7 +552,8 @@ def _bar_pair(
     )
 
     if rsa_errs or ecdsa_errs:
-        err_sets = [rsa_errs or [0.0] * len(security_bits), ecdsa_errs or [0.0] * len(security_bits)]
+        n_levels = len(rsa_vals)
+        err_sets = [rsa_errs or [0.0] * n_levels, ecdsa_errs or [0.0] * n_levels]
         for container, errs in zip(ax.containers[:2], err_sets):
             centers = [bar.get_x() + (bar.get_width() / 2) for bar in container]
             heights = [bar.get_height() for bar in container]
@@ -583,7 +585,7 @@ def generate_graphs(results: list[dict], batch_results: list[dict]) -> None:
     # ── 1. Signing time (mean ± stdev error bars) ──────────────────────────
     fig, ax = plt.subplots(figsize=(12, 6.5))
     _bar_pair(
-        ax, x,
+        ax,
         [r["rsa_sign_mean_ms"] for r in results],
         [r["ecdsa_sign_mean_ms"] for r in results],
         ylabel="Sign Time (ms)",
@@ -600,7 +602,7 @@ def generate_graphs(results: list[dict], batch_results: list[dict]) -> None:
     # ── 2. Single-op verification time (mean ± stdev) ──────────────────────
     fig, ax = plt.subplots(figsize=(12, 6.5))
     _bar_pair(
-        ax, x,
+        ax,
         [r["rsa_verify_mean_ms"] for r in results],
         [r["ecdsa_verify_mean_ms"] for r in results],
         ylabel="Verify Time (ms)",
@@ -617,7 +619,7 @@ def generate_graphs(results: list[dict], batch_results: list[dict]) -> None:
     # ── 3. CPU time consumed ───────────────────────────────────────────────
     fig, ax = plt.subplots(figsize=(12, 6.5))
     _bar_pair(
-        ax, x,
+        ax,
         [r["rsa_cpu_time_s"] for r in results],
         [r["ecdsa_cpu_time_s"] for r in results],
         ylabel="CPU Time (s)",
@@ -632,7 +634,7 @@ def generate_graphs(results: list[dict], batch_results: list[dict]) -> None:
     # ── 4. Memory delta ────────────────────────────────────────────────────
     fig, ax = plt.subplots(figsize=(12, 6.5))
     _bar_pair(
-        ax, x,
+        ax,
         [r["rsa_memory_delta_mb"] for r in results],
         [r["ecdsa_memory_delta_mb"] for r in results],
         ylabel="Memory Increase (MB)",
@@ -647,7 +649,7 @@ def generate_graphs(results: list[dict], batch_results: list[dict]) -> None:
     # ── 5. Public key size ─────────────────────────────────────────────────
     fig, ax = plt.subplots(figsize=(12, 6.5))
     _bar_pair(
-        ax, x,
+        ax,
         [r["rsa_public_key_size"] / 1024 for r in results],
         [r["ecdsa_public_key_size"] / 1024 for r in results],
         ylabel="Key Size (KB)",
@@ -662,7 +664,7 @@ def generate_graphs(results: list[dict], batch_results: list[dict]) -> None:
     # ── 6. Signature size ──────────────────────────────────────────────────
     fig, ax = plt.subplots(figsize=(12, 6.5))
     _bar_pair(
-        ax, x,
+        ax,
         [r["rsa_signature_size"] for r in results],
         [r["ecdsa_signature_size"] for r in results],
         ylabel="Signature Size (bytes)",
