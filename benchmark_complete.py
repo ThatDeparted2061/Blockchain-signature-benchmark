@@ -18,6 +18,7 @@ OUTPUT:
 """
 
 import csv
+import math
 import os
 import platform
 import statistics
@@ -202,8 +203,10 @@ OUTPUT_DIR    = Path(__file__).parent / "results"
 GRAPHS_DIR    = OUTPUT_DIR / "graphs"
 CSV_PATH      = OUTPUT_DIR / "benchmark_results_comprehensive.csv"
 BATCH_CSV_PATH = OUTPUT_DIR / "batch_verification_results.csv"
+EXPONENT_VALUES_PATH = Path(__file__).parent / "exponent_values" / "exponent_values.txt"
 
 TRANSACTION_COUNTS = [5_000, 10_000, 15_000, 20_000, 25_000, 30_000]
+EXPONENT_BENCHMARK_KEY_SIZE = 3072
 
 
 # ============================================================================
@@ -270,6 +273,71 @@ def measure_batch_milestones(verify_fn, tx_counts: list[int]) -> dict[int, float
             results[i] = (time.perf_counter() - t_start) * 1000.0
 
     return results
+
+
+def load_exponent_values(path: Path) -> list[tuple[int, int]]:
+    """Load (k exponent label, e public exponent value) pairs from exponent_values.txt."""
+    values: list[tuple[int, int]] = []
+    if not path.exists():
+        return values
+
+    with path.open("r", encoding="utf-8") as f:
+        for raw_line in f:
+            line = raw_line.strip().replace(" ", "")
+            if not line.startswith("k=") or ":e=" not in line:
+                continue
+            left, right = line.split(":e=", maxsplit=1)
+            try:
+                k_val = int(left.split("=", maxsplit=1)[1])
+                e_val = int(right)
+            except (IndexError, ValueError):
+                continue
+            values.append((k_val, e_val))
+    return sorted(values, key=lambda x: x[0])
+
+
+def build_rsa_private_key_for_exponent(key_size: int, exponent: int,
+                                       max_attempts: int = 30):
+    """
+    Build an RSA private key for a custom odd exponent.
+    cryptography's keygen API only allows e=3 or 65537, so we derive p,q from
+    generated keys and reconstruct private numbers for the requested exponent.
+    """
+    if exponent <= 1 or exponent % 2 == 0:
+        raise ValueError(f"public exponent must be an odd integer > 1, got {exponent}")
+
+    for _ in range(max_attempts):
+        seed_key = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=key_size,
+            backend=default_backend(),
+        )
+        nums = seed_key.private_numbers()
+        p, q = nums.p, nums.q
+        phi = (p - 1) * (q - 1)
+        if math.gcd(exponent, phi) != 1:
+            continue
+
+        d = pow(exponent, -1, phi)
+        dmp1 = d % (p - 1)
+        dmq1 = d % (q - 1)
+        iqmp = pow(q, -1, p)
+
+        private_numbers = rsa.RSAPrivateNumbers(
+            p=p,
+            q=q,
+            d=d,
+            dmp1=dmp1,
+            dmq1=dmq1,
+            iqmp=iqmp,
+            public_numbers=rsa.RSAPublicNumbers(exponent, p * q),
+        )
+        return private_numbers.private_key(default_backend())
+
+    raise ValueError(
+        f"unable to construct {key_size}-bit RSA key with exponent {exponent} "
+        f"after {max_attempts} attempts"
+    )
 
 
 # ============================================================================
@@ -426,7 +494,62 @@ def benchmark_ecdsa(curve_name: str, security_bits: int,
 # MAIN BENCHMARK ORCHESTRATION
 # ============================================================================
 
-def run_benchmark() -> tuple[list, list]:
+def run_exponent_batch_benchmark() -> list[dict]:
+    """Measure RSA batch verification totals across configured public exponents."""
+    exponent_pairs = load_exponent_values(EXPONENT_VALUES_PATH)
+    if not exponent_pairs:
+        print("⚠️   No exponent values found; skipping exponent line graph data.")
+        return []
+
+    print("🔣  RSA Exponent Benchmark")
+    print(f"    Key size: {EXPONENT_BENCHMARK_KEY_SIZE}-bit")
+    print(f"    Exponents: {', '.join(f'k={k}' for k, _ in exponent_pairs)}")
+    print(f"    {'─' * 74}")
+
+    benchmark_data: list[dict] = []
+    for k_val, exponent in exponent_pairs:
+        print(f"   🔓 RSA verify benchmark for k={k_val} (e={exponent})...", end=" ", flush=True)
+        try:
+            private_key = build_rsa_private_key_for_exponent(
+                key_size=EXPONENT_BENCHMARK_KEY_SIZE,
+                exponent=exponent,
+            )
+            public_key = private_key.public_key()
+            sign_pad   = padding.PSS(mgf=padding.MGF1(hashes.SHA256()),
+                                     salt_length=padding.PSS.MAX_LENGTH)
+            verify_pad = padding.PSS(mgf=padding.MGF1(hashes.SHA256()),
+                                     salt_length=padding.PSS.MAX_LENGTH)
+            hash_alg   = hashes.SHA256()
+
+            signatures = [
+                private_key.sign(TEST_MESSAGE, sign_pad, hash_alg)
+                for _ in range(SIG_POOL_SIZE)
+            ]
+            pool_iter = cycle(signatures)
+
+            def verify_fn() -> None:
+                public_key.verify(next(pool_iter), TEST_MESSAGE, verify_pad, hash_alg)
+
+            milestones = measure_batch_milestones(verify_fn, TRANSACTION_COUNTS)
+            print("✅")
+            for tx_count in TRANSACTION_COUNTS:
+                total_ms = milestones.get(tx_count, 0.0)
+                benchmark_data.append({
+                    "k": k_val,
+                    "public_exponent": exponent,
+                    "tx_count": tx_count,
+                    "rsa_verify_total_ms": round(total_ms, 2),
+                })
+                print(f"       {tx_count:>6,} tx  total={total_ms:>8.0f} ms")
+        except Exception as exc:
+            print(f"❌  {exc}")
+            continue
+
+    print()
+    return benchmark_data
+
+
+def run_benchmark() -> tuple[list, list, list]:
     print("=" * 80)
     print("🔐  COMPREHENSIVE ECDSA vs RSA-PSS Benchmark")
     print("=" * 80)
@@ -514,7 +637,8 @@ def run_benchmark() -> tuple[list, list]:
                   f"ratio={ratio:.3f}")
         print()
 
-    return results, batch_results
+    exponent_batch_results = run_exponent_batch_benchmark()
+    return results, batch_results, exponent_batch_results
 
 
 # ============================================================================
@@ -566,7 +690,8 @@ def _fmt_ms(v: float) -> str:
     return f"{v:.3f}"
 
 
-def generate_graphs(results: list[dict], batch_results: list[dict]) -> None:
+def generate_graphs(results: list[dict], batch_results: list[dict],
+                    exponent_batch_results: list[dict]) -> None:
     GRAPHS_DIR.mkdir(parents=True, exist_ok=True)
     setup_publication_style()
 
@@ -956,6 +1081,29 @@ def generate_graphs(results: list[dict], batch_results: list[dict]) -> None:
     fig.tight_layout()
     _save(fig, "verification_ratio_summary.png")
 
+    # ════════════════════════════════════════════════════════════════════════
+    # 9. EXPONENT BENCHMARK: VERIFICATION TIME vs TRANSACTION COUNT
+    # ════════════════════════════════════════════════════════════════════════
+    if exponent_batch_results:
+        fig, ax = plt.subplots(figsize=(9, 5))
+        exponent_values = sorted({row["k"] for row in exponent_batch_results})
+        tx_ticks = sorted({row["tx_count"] for row in exponent_batch_results})
+        for k_val in exponent_values:
+            rows = sorted(
+                [row for row in exponent_batch_results if row["k"] == k_val],
+                key=lambda r: r["tx_count"],
+            )
+            xs = [row["tx_count"] for row in rows]
+            ys = [row["rsa_verify_total_ms"] for row in rows]
+            ax.plot(xs, ys, marker="o", linewidth=2, label=f"k={k_val}")
+
+        ax.set_xticks(tx_ticks)
+        ax.set_xticklabels([f"{x:,}" for x in tx_ticks])
+        ax.set_xlabel("Transaction Count")
+        ax.set_ylabel("Verification Time (ms)")
+        ax.legend()
+        _save(fig, "verification_time_exponent_line.png")
+
     print(f"\n✅  All graphs saved to: {GRAPHS_DIR}\n")
 
 
@@ -1001,7 +1149,7 @@ def print_summary(results: list[dict]) -> None:
 
 if __name__ == "__main__":
     print(f"\n⏱️   Starting benchmark at {datetime.now()}\n")
-    results, batch_results = run_benchmark()
+    results, batch_results, exponent_batch_results = run_benchmark()
 
     if not results:
         print("❌  Benchmark failed — no results produced.")
@@ -1009,7 +1157,7 @@ if __name__ == "__main__":
 
     save_results(results, batch_results)
     print("📊  Generating graphs …")
-    generate_graphs(results, batch_results)
+    generate_graphs(results, batch_results, exponent_batch_results)
     print_summary(results)
 
     print("=" * 80)
