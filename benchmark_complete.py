@@ -1087,6 +1087,7 @@ def generate_graphs(results: list[dict], batch_results: list[dict],
     if exponent_batch_results:
         fig, ax = plt.subplots(figsize=(9, 5))
         exponent_values = sorted({row["k"] for row in exponent_batch_results})
+        tx_ticks = sorted({row["tx_count"] for row in exponent_batch_results})
         for k_val in exponent_values:
             rows = sorted(
                 [row for row in exponent_batch_results if row["k"] == k_val],
@@ -1096,8 +1097,8 @@ def generate_graphs(results: list[dict], batch_results: list[dict],
             ys = [row["rsa_verify_total_ms"] for row in rows]
             ax.plot(xs, ys, marker="o", linewidth=2, label=f"k={k_val}")
 
-        ax.set_xticks(TRANSACTION_COUNTS)
-        ax.set_xticklabels([f"{x:,}" for x in TRANSACTION_COUNTS])
+        ax.set_xticks(tx_ticks)
+        ax.set_xticklabels([f"{x:,}" for x in tx_ticks])
         ax.set_xlabel("Transaction Count")
         ax.set_ylabel("Verification Time (ms)")
         ax.legend()
