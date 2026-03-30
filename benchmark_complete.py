@@ -18,6 +18,7 @@ OUTPUT:
 """
 
 import csv
+import math
 import os
 import platform
 import statistics
@@ -295,6 +296,50 @@ def load_exponent_values(path: Path) -> list[tuple[int, int]]:
     return sorted(values, key=lambda x: x[0])
 
 
+def build_rsa_private_key_for_exponent(key_size: int, exponent: int,
+                                       max_attempts: int = 30):
+    """
+    Build an RSA private key for a custom odd exponent.
+    cryptography's keygen API only allows e=3 or 65537, so we derive p,q from
+    generated keys and reconstruct private numbers for the requested exponent.
+    """
+    if exponent <= 1 or exponent % 2 == 0:
+        raise ValueError("public exponent must be an odd integer > 1")
+
+    for _ in range(max_attempts):
+        seed_key = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=key_size,
+            backend=default_backend(),
+        )
+        nums = seed_key.private_numbers()
+        p, q = nums.p, nums.q
+        phi = (p - 1) * (q - 1)
+        if math.gcd(exponent, phi) != 1:
+            continue
+
+        d = pow(exponent, -1, phi)
+        dmp1 = d % (p - 1)
+        dmq1 = d % (q - 1)
+        iqmp = pow(q, -1, p)
+
+        private_numbers = rsa.RSAPrivateNumbers(
+            p=p,
+            q=q,
+            d=d,
+            dmp1=dmp1,
+            dmq1=dmq1,
+            iqmp=iqmp,
+            public_numbers=rsa.RSAPublicNumbers(exponent, p * q),
+        )
+        return private_numbers.private_key(default_backend())
+
+    raise ValueError(
+        f"unable to construct RSA key with exponent {exponent} "
+        f"after {max_attempts} attempts"
+    )
+
+
 # ============================================================================
 # BENCHMARK FUNCTIONS
 # ============================================================================
@@ -465,10 +510,9 @@ def run_exponent_batch_benchmark() -> list[dict]:
     for k_val, exponent in exponent_pairs:
         print(f"   🔓 RSA verify benchmark for k={k_val} (e={exponent})...", end=" ", flush=True)
         try:
-            private_key = rsa.generate_private_key(
-                public_exponent=exponent,
+            private_key = build_rsa_private_key_for_exponent(
                 key_size=EXPONENT_BENCHMARK_KEY_SIZE,
-                backend=default_backend(),
+                exponent=exponent,
             )
             public_key = private_key.public_key()
             sign_pad   = padding.PSS(mgf=padding.MGF1(hashes.SHA256()),
