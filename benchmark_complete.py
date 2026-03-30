@@ -276,7 +276,7 @@ def measure_batch_milestones(verify_fn, tx_counts: list[int]) -> dict[int, float
 
 
 def load_exponent_values(path: Path) -> list[tuple[int, int]]:
-    """Load (k, e) pairs from exponent_values.txt."""
+    """Load (k exponent label, e public exponent value) pairs from exponent_values.txt."""
     values: list[tuple[int, int]] = []
     if not path.exists():
         return values
@@ -304,7 +304,7 @@ def build_rsa_private_key_for_exponent(key_size: int, exponent: int,
     generated keys and reconstruct private numbers for the requested exponent.
     """
     if exponent <= 1 or exponent % 2 == 0:
-        raise ValueError("public exponent must be an odd integer > 1")
+        raise ValueError(f"public exponent must be an odd integer > 1, got {exponent}")
 
     for _ in range(max_attempts):
         seed_key = rsa.generate_private_key(
@@ -335,7 +335,7 @@ def build_rsa_private_key_for_exponent(key_size: int, exponent: int,
         return private_numbers.private_key(default_backend())
 
     raise ValueError(
-        f"unable to construct RSA key with exponent {exponent} "
+        f"unable to construct {key_size}-bit RSA key with exponent {exponent} "
         f"after {max_attempts} attempts"
     )
 
