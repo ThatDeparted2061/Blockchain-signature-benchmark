@@ -46,6 +46,7 @@ python3 benchmark_complete.py
 - `verification_time_25k.png`
 - `verification_time_30k.png`
 - `verification_ratio_summary.png`
+- `verification_time_exponent_line.png`
 
 ## Metrics Reported
 
