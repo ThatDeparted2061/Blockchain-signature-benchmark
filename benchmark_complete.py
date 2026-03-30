@@ -1039,7 +1039,7 @@ def generate_graphs(results: list[dict], batch_results: list[dict],
         _save(fig, fname)
 
     # ════════════════════════════════════════════════════════════════════════
-    # 8. RATIO SUMMARY (all batch sizes × selected security levels)
+    # 8. RATIO SUMMARY (all batch sizes × selected security level)
     # ════════════════════════════════════════════════════════════════════════
     # Use a sequential colormap so the 6 tx-count lines are distinguishable
     import matplotlib.cm as cm
