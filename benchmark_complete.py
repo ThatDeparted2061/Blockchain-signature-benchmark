@@ -167,24 +167,24 @@ def _xtick_labels(ax, bits: list, font_kw: dict | None = None) -> None:
 # ============================================================================
 
 SECURITY_LEVELS = [
-    {
-        "bits": 112,
-        "rsa": 2048,
-        "ecdsa": "secp224r1",
-        "notes": "secp224r1 baseline (~112-bit)",
-    },
+    # {
+    #     "bits": 112,
+    #     "rsa": 2048,
+    #     "ecdsa": "secp224r1",
+    #     "notes": "secp224r1 baseline (~112-bit)",
+    # },
     {
         "bits": 128,
         "rsa": 3072,
         "ecdsa": "P-256",
         "notes": "Modern standard baseline",
     },
-    {
-        "bits": 192,
-        "rsa": 7680,
-        "ecdsa": "P-384",
-        "notes": "High security",
-    },
+    # {
+    #     "bits": 192,
+    #     "rsa": 7680,
+    #     "ecdsa": "P-384",
+    #     "notes": "High security",
+    # },
 ]
 
 CURVES: dict = {
@@ -795,7 +795,7 @@ def generate_graphs(results: list[dict], batch_results: list[dict],
     ax.set_xticklabels(paired_ticks, fontsize=9)
     ax.set_xlabel("Security Level (RSA key size / ECDSA curve)", labelpad=6)
     ax.set_ylabel("Mean Verification Time (ms) ± 1σ")
-    ax.set_title("Single-Operation Verification: RSA-PSS Is Faster at All Security Levels\n"
+    ax.set_title("Single-Operation Verification: RSA-PSS vs ECDSA at 128-bit Security\n"
                  "— structural advantage from fixed-cost public exponent e = 65537")
     ax.legend(handles=_legend_handles(), loc="upper left")
     _save(fig, "verification_time_single.png")
@@ -828,7 +828,7 @@ def generate_graphs(results: list[dict], batch_results: list[dict],
     ax.set_xlabel("Security Level (RSA key size / ECDSA curve)", labelpad=6)
     ax.set_ylabel("Total CPU Time — Sign + Verify Phase (s)")
     ax.set_title("CPU Time: RSA-PSS Consumes More CPU, Dominated by Signing\n"
-                 "— at 192-bit the 7680-bit private exponent drives the gap")
+                 "— compared at 128-bit security (RSA-3072 vs P-256)")
     ax.legend(handles=_legend_handles(), loc="upper left")
     ax.text(0.97, 0.97,
             "RSA signing uses the full\nprivate exponent d.\n"
@@ -863,8 +863,8 @@ def generate_graphs(results: list[dict], batch_results: list[dict],
     ax.set_xticklabels(paired_ticks, fontsize=9)
     ax.set_xlabel("Security Level (RSA key size / ECDSA curve)", labelpad=6)
     ax.set_ylabel("Process RSS Increase (MB)")
-    ax.set_title("Memory Footprint: Comparable at 128-bit and 192-bit Security\n"
-                 "— 112-bit RSA shows higher allocation from 2048-bit key material")
+    ax.set_title("Memory Footprint at 128-bit Security\n"
+                 "— baseline process RSS increase for RSA-PSS vs ECDSA")
     ax.legend(handles=_legend_handles(), loc="upper right")
     ax.text(0.97, 0.55,
             "Memory differences are\nnot sustained — both\nschemes are\ncomputation-bound.",
@@ -1020,7 +1020,7 @@ def generate_graphs(results: list[dict], batch_results: list[dict],
         ax1.grid(axis="y", alpha=0.25, zorder=0)
         ax1.set_title(
             f"Batch Verification — {tx_count:,} Transactions\n"
-            f"RSA-PSS is consistently faster; ratio below 1.0 at every security level")
+            f"RSA-PSS vs ECDSA ratio at 128-bit security")
 
         h1, l1 = ax1.get_legend_handles_labels()
         ratio_handle = plt.Line2D([0], [0], color=RATIO_COLOR, marker="D",
@@ -1039,7 +1039,7 @@ def generate_graphs(results: list[dict], batch_results: list[dict],
         _save(fig, fname)
 
     # ════════════════════════════════════════════════════════════════════════
-    # 8. RATIO SUMMARY (all batch sizes × all security levels)
+    # 8. RATIO SUMMARY (all batch sizes × selected security levels)
     # ════════════════════════════════════════════════════════════════════════
     # Use a sequential colormap so the 6 tx-count lines are distinguishable
     import matplotlib.cm as cm
@@ -1073,8 +1073,8 @@ def generate_graphs(results: list[dict], batch_results: list[dict],
     ax.set_xlabel("Security Level (bits)", labelpad=6)
     ax.set_ylabel("Verification Time Ratio (RSA / ECDSA)\nLower = RSA faster")
     ax.set_title(
-        "Batch Verification Ratio Across All Security Levels and Transaction Counts\n"
-        "— ratio is stable across batch sizes, confirming a per-operation advantage")
+        "Batch Verification Ratio at 128-bit Security Across Transaction Counts\n"
+        "— ratio remains stable across batch sizes")
     ax.legend(ncol=4, fontsize=8.5, loc="upper center",
               bbox_to_anchor=(0.5, -0.18), frameon=True)
 
