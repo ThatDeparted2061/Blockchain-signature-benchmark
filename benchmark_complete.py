@@ -167,24 +167,24 @@ def _xtick_labels(ax, bits: list, font_kw: dict | None = None) -> None:
 # ============================================================================
 
 SECURITY_LEVELS = [
-    {
-        "bits": 112,
-        "rsa": 2048,
-        "ecdsa": "secp224r1",
-        "notes": "secp224r1 baseline (~112-bit)",
-    },
+    # {
+    #     "bits": 112,
+    #     "rsa": 2048,
+    #     "ecdsa": "secp224r1",
+    #     "notes": "secp224r1 baseline (~112-bit)",
+    # },
     {
         "bits": 128,
         "rsa": 3072,
         "ecdsa": "P-256",
         "notes": "Modern standard baseline",
     },
-    {
-        "bits": 192,
-        "rsa": 7680,
-        "ecdsa": "P-384",
-        "notes": "High security",
-    },
+    # {
+    #     "bits": 192,
+    #     "rsa": 7680,
+    #     "ecdsa": "P-384",
+    #     "notes": "High security",
+    # },
 ]
 
 CURVES: dict = {
@@ -1085,6 +1085,11 @@ def generate_graphs(results: list[dict], batch_results: list[dict],
     # 9. EXPONENT BENCHMARK: VERIFICATION TIME vs TRANSACTION COUNT
     # ════════════════════════════════════════════════════════════════════════
     if exponent_batch_results:
+        ecdsa_128_rows = sorted(
+            [row for row in batch_results if row["security_bits"] == 128],
+            key=lambda r: r["tx_count"],
+        )
+
         fig, ax = plt.subplots(figsize=(9, 5))
         exponent_values = sorted({row["k"] for row in exponent_batch_results})
         tx_ticks = sorted({row["tx_count"] for row in exponent_batch_results})
@@ -1095,14 +1100,63 @@ def generate_graphs(results: list[dict], batch_results: list[dict],
             )
             xs = [row["tx_count"] for row in rows]
             ys = [row["rsa_verify_total_ms"] for row in rows]
-            ax.plot(xs, ys, marker="o", linewidth=2, label=f"k={k_val}")
+            ax.plot(xs, ys, marker="o", linewidth=2, label=f"RSA k={k_val}")
+
+        if ecdsa_128_rows:
+            ecdsa_xs = [row["tx_count"] for row in ecdsa_128_rows]
+            ecdsa_ys = [row["ecdsa_verify_total_ms"] for row in ecdsa_128_rows]
+            ax.plot(
+                ecdsa_xs,
+                ecdsa_ys,
+                marker="s",
+                linewidth=2.4,
+                linestyle="--",
+                color=ECDSA_COLOR,
+                markerfacecolor="white",
+                markeredgewidth=1.8,
+                label="ECDSA P-256 (128-bit)",
+            )
 
         ax.set_xticks(tx_ticks)
         ax.set_xticklabels([f"{x:,}" for x in tx_ticks])
         ax.set_xlabel("Transaction Count")
         ax.set_ylabel("Verification Time (ms)")
+        ax.set_title("Verification Time vs Transaction Count (128-bit Security)")
         ax.legend()
         _save(fig, "verification_time_exponent_line.png")
+
+        fig, ax = plt.subplots(figsize=(9, 5))
+        for k_val in exponent_values:
+            rows = sorted(
+                [row for row in exponent_batch_results if row["k"] == k_val],
+                key=lambda r: r["tx_count"],
+            )
+            xs = [row["tx_count"] for row in rows]
+            ys_energy_mj = [row["rsa_verify_total_ms"] for row in rows]  # 1W model: mJ = ms
+            ax.plot(xs, ys_energy_mj, marker="o", linewidth=2, label=f"RSA k={k_val}")
+
+        if ecdsa_128_rows:
+            ecdsa_xs = [row["tx_count"] for row in ecdsa_128_rows]
+            ecdsa_energy_mj = [row["ecdsa_verify_total_ms"] for row in ecdsa_128_rows]
+            ax.plot(
+                ecdsa_xs,
+                ecdsa_energy_mj,
+                marker="s",
+                linewidth=2.4,
+                linestyle="--",
+                color=ECDSA_COLOR,
+                markerfacecolor="white",
+                markeredgewidth=1.8,
+                label="ECDSA P-256 (128-bit)",
+            )
+
+        ax.set_xticks(tx_ticks)
+        ax.set_xticklabels([f"{x:,}" for x in tx_ticks])
+        ax.set_xlabel("Transaction Count")
+        ax.set_ylabel("Estimated Verification Energy (mJ, 1W model)")
+        ax.set_title("Verification Energy vs Transaction Count (128-bit Security)")
+        ax.legend()
+        _save(fig, "verification_energy_exponent_line.png")
 
     print(f"\n✅  All graphs saved to: {GRAPHS_DIR}\n")
 
