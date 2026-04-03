@@ -190,7 +190,6 @@ TEST_MESSAGE = b"Blockchain transaction data for signing and verification benchm
 OUTPUT_DIR        = Path(__file__).parent / "results"
 GRAPHS_DIR        = OUTPUT_DIR / "graphs"
 CSV_PATH          = OUTPUT_DIR / "benchmark_results_comprehensive.csv"
-BATCH_CSV_PATH    = OUTPUT_DIR / "batch_verification_results.csv"
 EXPONENT_VALUES_PATH = (
     Path(__file__).parent / "exponent_values" / "exponent_values.txt"
 )
@@ -584,15 +583,14 @@ def run_exponent_batch_benchmark() -> list[dict]:
     return benchmark_data
 
 
-def run_benchmark() -> tuple[list, list, list]:
+def run_benchmark() -> tuple[list, list]:
     print("=" * 80)
     print("🔐  COMPREHENSIVE ECDSA vs RSA-PSS Benchmark")
     print("=" * 80)
     log_system_info()
     print(f"Started: {datetime.now()}\n")
 
-    results:       list[dict] = []
-    batch_results: list[dict] = []
+    results: list[dict] = []
 
     for level in SECURITY_LEVELS:
         bits        = level["bits"]
@@ -648,47 +646,15 @@ def run_benchmark() -> tuple[list, list, list]:
         }
         results.append(result_row)
 
-        # ── Batch verification: time ───────────────────────────────────────
-        print(f"\n    ⏳  Batch verification "
-              f"({', '.join(f'{t // 1000}k' for t in TRANSACTION_COUNTS)} tx) …")
-        rsa_milestones   = measure_batch_milestones(
-            rsa_r["rsa_verify_fn"],   TRANSACTION_COUNTS)
-        ecdsa_milestones = measure_batch_milestones(
-            ecdsa_r["ecdsa_verify_fn"], TRANSACTION_COUNTS)
-
-        # ── Batch verification: energy (one rate estimate, then scale) ─────
-        print("    ⚡  Measuring energy rates …")
-        rsa_rate_mj   = measure_energy_rate_mj_per_op(rsa_r["rsa_verify_fn"])
-        ecdsa_rate_mj = measure_energy_rate_mj_per_op(ecdsa_r["ecdsa_verify_fn"])
-
-        for tx in TRANSACTION_COUNTS:
-            rsa_total   = rsa_milestones.get(tx,   0.0)
-            ecdsa_total = ecdsa_milestones.get(tx, 0.0)
-            ratio       = rsa_total / ecdsa_total if ecdsa_total else 0.0
-            batch_results.append({
-                "security_bits":          bits,
-                "tx_count":               tx,
-                "rsa_verify_total_ms":    round(rsa_total,          2),
-                "ecdsa_verify_total_ms":  round(ecdsa_total,        2),
-                "verify_ratio_rsa_ecdsa": round(ratio,              4),
-                "rsa_verify_energy_mj":   round(rsa_rate_mj   * tx, 4),
-                "ecdsa_verify_energy_mj": round(ecdsa_rate_mj * tx, 4),
-            })
-            print(f"       {tx:>6,} tx  "
-                  f"RSA={rsa_total:>8.0f} ms  "
-                  f"ECDSA={ecdsa_total:>8.0f} ms  "
-                  f"ratio={ratio:.3f}")
-        print()
-
     exponent_batch_results = run_exponent_batch_benchmark()
-    return results, batch_results, exponent_batch_results
+    return results, exponent_batch_results
 
 
 # ============================================================================
 # SAVE RESULTS
 # ============================================================================
 
-def save_results(results: list[dict], batch_results: list[dict]) -> None:
+def save_results(results: list[dict]) -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     with open(CSV_PATH, "w", newline="") as f:
@@ -696,13 +662,6 @@ def save_results(results: list[dict], batch_results: list[dict]) -> None:
         writer.writeheader()
         writer.writerows(results)
     print(f"✅  Saved: {CSV_PATH}")
-
-    if batch_results:
-        with open(BATCH_CSV_PATH, "w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=batch_results[0].keys())
-            writer.writeheader()
-            writer.writerows(batch_results)
-        print(f"✅  Saved: {BATCH_CSV_PATH}\n")
 
 
 # ============================================================================
@@ -720,11 +679,6 @@ def save_results(results: list[dict], batch_results: list[dict]) -> None:
 #   signature_size.png                     — Signature size: RSA-PSS vs ECDSA
 #   verification_time_exponent_line.png    — Verify time vs no. of transactions
 #   verification_energy_exponent_line.png  — Verify energy vs no. of transactions
-#
-# NOT produced (intentionally removed):
-#   memory_usage.png                 — memory footprint graph
-#   batch_verification_128bit.png    — singleton RSA/ECDSA batch time graph
-#   verification_ratio_summary.png   — singleton RSA/ECDSA ratio graph
 # ============================================================================
 
 def _save(fig: plt.Figure, name: str) -> None:
@@ -736,7 +690,6 @@ def _save(fig: plt.Figure, name: str) -> None:
 
 def generate_graphs(
     results: list[dict],
-    batch_results: list[dict],
     exponent_batch_results: list[dict],
 ) -> None:
     GRAPHS_DIR.mkdir(parents=True, exist_ok=True)
@@ -837,16 +790,6 @@ def generate_graphs(
         ax.legend()
         _save(fig, "signature_size.png")
 
-    # ── batch_verification_128bit.png and verification_ratio_summary.png ──
-    # These singleton RSA/ECDSA batch graphs have been intentionally removed.
-    # The exponent benchmark graphs (below) supersede them.
-
-    # Retain batch_128 for use as the ECDSA overlay in the exponent graphs.
-    batch_128 = sorted(
-        [r for r in batch_results if r["security_bits"] == 128],
-        key=lambda r: r["tx_count"],
-    )
-
     # ── 6 & 7. EXPONENT BENCHMARK GRAPHS ──────────────────────────────────
     if exponent_batch_results:
         k_values = sorted({r["k"]        for r in exponent_batch_results})
@@ -871,17 +814,6 @@ def generate_graphs(
                 label=f"k = {k_val}",
             )
 
-        # Overlay ECDSA P-256 128-bit
-        if batch_128:
-            ax.plot(
-                [r["tx_count"]             for r in batch_128],
-                [r["ecdsa_verify_total_ms"] for r in batch_128],
-                marker="s", linewidth=2.4, linestyle="--",
-                color=ECDSA_COLOR,
-                markerfacecolor="white", markeredgewidth=1.8,
-                label="ECDSA P-256",
-            )
-
         ax.set_xticks(tx_ticks)
         ax.set_xticklabels([f"{x:,}" for x in tx_ticks], fontsize=9)
         ax.set_xlabel("Number of Transactions")
@@ -903,17 +835,6 @@ def generate_graphs(
                 marker=markers[idx % len(markers)],
                 color=cmap(idx), linewidth=2,
                 label=f"k = {k_val}",
-            )
-
-        # Overlay ECDSA P-256 128-bit energy
-        if batch_128 and "ecdsa_verify_energy_mj" in batch_128[0]:
-            ax.plot(
-                [r["tx_count"]               for r in batch_128],
-                [r["ecdsa_verify_energy_mj"] for r in batch_128],
-                marker="s", linewidth=2.4, linestyle="--",
-                color=ECDSA_COLOR,
-                markerfacecolor="white", markeredgewidth=1.8,
-                label="ECDSA P-256",
             )
 
         ax.set_xticks(tx_ticks)
@@ -970,20 +891,19 @@ def print_summary(results: list[dict]) -> None:
 
 if __name__ == "__main__":
     print(f"\n⏱️   Starting benchmark at {datetime.now()}\n")
-    results, batch_results, exponent_batch_results = run_benchmark()
+    results, exponent_batch_results = run_benchmark()
 
     if not results:
         print("❌  Benchmark failed — no results produced.")
         sys.exit(1)
 
-    save_results(results, batch_results)
+    save_results(results)
     print("📊  Generating graphs …")
-    generate_graphs(results, batch_results, exponent_batch_results)
+    generate_graphs(results, exponent_batch_results)
     print_summary(results)
 
     print("=" * 80)
     print(f"✅  Complete at {datetime.now()}")
     print(f"    Main CSV  : {CSV_PATH}")
-    print(f"    Batch CSV : {BATCH_CSV_PATH}")
     print(f"    Graphs    : {GRAPHS_DIR}")
     print("=" * 80)
