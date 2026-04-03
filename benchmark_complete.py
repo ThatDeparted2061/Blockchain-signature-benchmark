@@ -795,20 +795,6 @@ def generate_graphs(
         ax.legend()
         _save(fig, "cpu_time.png")
 
-        # ── 4. MEMORY USAGE ────────────────────────────────────────────────
-        fig, ax = plt.subplots(figsize=(9, 5))
-        ax.plot(sec_bits, [r["rsa_memory_delta_mb"]   for r in results],
-                "-o", color=RSA_COLOR,   label="RSA-PSS", linewidth=2)
-        ax.plot(sec_bits, [r["ecdsa_memory_delta_mb"] for r in results],
-                "-s", color=ECDSA_COLOR, label="ECDSA",   linewidth=2)
-        ax.set_xticks(sec_bits)
-        ax.set_xticklabels(xtick_labels, fontsize=9)
-        ax.set_xlabel("Security Level (RSA key size / ECDSA curve)")
-        ax.set_ylabel("Process RSS Increase (MB)")
-        ax.set_title("Memory Footprint: RSA-PSS vs ECDSA")
-        ax.legend()
-        _save(fig, "memory_usage.png")
-
         # ── 5. PUBLIC KEY SIZE ─────────────────────────────────────────────
         fig, ax = plt.subplots(figsize=(9, 5))
         ax.plot(sec_bits, [r["rsa_public_key_size"]   / 1024 for r in results],
@@ -837,46 +823,11 @@ def generate_graphs(
         ax.legend()
         _save(fig, "signature_size.png")
 
-    # ── 7. BATCH VERIFICATION — total time, 128-bit, tx_count on x-axis ───
+    # ── 7. BATCH VERIFICATION — build batch_128 for overlay in graphs 8 & 9 ─
     batch_128 = sorted(
         [r for r in batch_results if r["security_bits"] == 128],
         key=lambda r: r["tx_count"],
     )
-    if batch_128:
-        xs         = [r["tx_count"]              for r in batch_128]
-        rsa_totals = [r["rsa_verify_total_ms"]   for r in batch_128]
-        ec_totals  = [r["ecdsa_verify_total_ms"] for r in batch_128]
-        ratios     = [r["verify_ratio_rsa_ecdsa"]for r in batch_128]
-
-        # 7a. Total verification time vs transaction count
-        fig, ax = plt.subplots(figsize=(9, 5))
-        ax.plot(xs, rsa_totals, "-o", color=RSA_COLOR,
-                label="RSA-PSS (128-bit)", linewidth=2)
-        ax.plot(xs, ec_totals,  "-s", color=ECDSA_COLOR,
-                label="ECDSA P-256 (128-bit)", linewidth=2)
-        ax.set_xticks(xs)
-        ax.set_xticklabels([f"{x:,}" for x in xs], fontsize=9)
-        ax.set_xlabel("Transaction Count")
-        ax.set_ylabel("Total Verification Time (ms)")
-        ax.set_title("Batch Verification Time: RSA-PSS vs ECDSA (128-bit Security)")
-        ax.legend()
-        _save(fig, "batch_verification_128bit.png")
-
-        # 7b. Verification time ratio vs transaction count
-        fig, ax = plt.subplots(figsize=(9, 5))
-        ax.plot(xs, ratios, "-D", color=RATIO_COLOR,
-                label="RSA / ECDSA ratio", linewidth=2,
-                markerfacecolor="white", markeredgewidth=2,
-                markeredgecolor=RATIO_COLOR)
-        ax.axhline(1.0, color="#E74C3C", linewidth=1.0,
-                   linestyle="--", alpha=0.7, label="Parity (ratio = 1.0)")
-        ax.set_xticks(xs)
-        ax.set_xticklabels([f"{x:,}" for x in xs], fontsize=9)
-        ax.set_xlabel("Transaction Count")
-        ax.set_ylabel("Verification Time Ratio (RSA / ECDSA)")
-        ax.set_title("Batch Verification Ratio: RSA-PSS vs ECDSA (128-bit Security)")
-        ax.legend()
-        _save(fig, "verification_ratio_summary.png")
 
     # ── 8 & 9. EXPONENT BENCHMARK GRAPHS ─────────────────────────────────
     if exponent_batch_results:
@@ -899,7 +850,7 @@ def generate_graphs(
                 [r["rsa_verify_total_ms"] for r in rows],
                 marker=markers[idx % len(markers)],
                 color=cmap(idx), linewidth=2,
-                label=f"RSA k={k_val} (e={rows[0]['public_exponent']})",
+                label=f"k = {k_val}",
             )
 
         # Overlay ECDSA P-256 128-bit
@@ -915,9 +866,9 @@ def generate_graphs(
 
         ax.set_xticks(tx_ticks)
         ax.set_xticklabels([f"{x:,}" for x in tx_ticks], fontsize=9)
-        ax.set_xlabel("Transaction Count")
+        ax.set_xlabel("No of Transactions")
         ax.set_ylabel("Total Verification Time (ms)")
-        ax.set_title("Verification Time vs Transaction Count (128-bit Security)")
+        ax.set_title("Verification Time vs No of Transactions (128-bit Security)")
         ax.legend(fontsize=8, ncol=2)
         _save(fig, "verification_time_exponent_line.png")
 
@@ -933,7 +884,7 @@ def generate_graphs(
                 [r["rsa_verify_energy_mj"]   for r in rows],
                 marker=markers[idx % len(markers)],
                 color=cmap(idx), linewidth=2,
-                label=f"RSA k={k_val} (e={rows[0]['public_exponent']})",
+                label=f"k = {k_val}",
             )
 
         # Overlay ECDSA P-256 128-bit energy
@@ -949,10 +900,10 @@ def generate_graphs(
 
         ax.set_xticks(tx_ticks)
         ax.set_xticklabels([f"{x:,}" for x in tx_ticks], fontsize=9)
-        ax.set_xlabel("Transaction Count")
+        ax.set_xlabel("No of Transactions")
         energy_src = "RAPL via pyJoules" if PYJOULES_AVAILABLE else "1 W time model"
         ax.set_ylabel(f"Estimated Verification Energy (mJ)\n[{energy_src}]")
-        ax.set_title("Verification Energy vs Transaction Count (128-bit Security)")
+        ax.set_title("Verification Energy vs No of Transactions (128-bit Security)")
         ax.legend(fontsize=8, ncol=2)
         _save(fig, "verification_energy_exponent_line.png")
 
