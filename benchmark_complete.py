@@ -795,6 +795,16 @@ def generate_graphs(
         k_values = sorted({r["k"]        for r in exponent_batch_results})
         tx_ticks = sorted({r["tx_count"] for r in exponent_batch_results})
 
+        # Load ECDSA 128-bit batch data from batch_verification_results.csv
+        batch_csv = OUTPUT_DIR / "batch_verification_results.csv"
+        ecdsa_batch_rows: list[dict] = []
+        if batch_csv.exists():
+            with open(batch_csv, "r", newline="") as _f:
+                for _row in csv.DictReader(_f):
+                    if int(_row["security_bits"]) == 128:
+                        ecdsa_batch_rows.append(_row)
+            ecdsa_batch_rows.sort(key=lambda r: int(r["tx_count"]))
+
         # Distinct colour per exponent via tab10
         cmap    = cm.get_cmap("tab10", len(k_values))
         markers = ["o", "s", "D", "^", "v", "P", "X", "*"]
@@ -814,11 +824,18 @@ def generate_graphs(
                 label=f"k = {k_val}",
             )
 
+        if ecdsa_batch_rows:
+            ax.plot(
+                [int(r["tx_count"])                 for r in ecdsa_batch_rows],
+                [float(r["ecdsa_verify_total_ms"])  for r in ecdsa_batch_rows],
+                marker="*", color=ECDSA_COLOR, linewidth=2,
+                label="ECDSA 128-bit (P-256)",
+            )
+
         ax.set_xticks(tx_ticks)
         ax.set_xticklabels([f"{x:,}" for x in tx_ticks], fontsize=9)
         ax.set_xlabel("Number of Transactions")
-        ax.set_ylabel("Total Verification Time (ms)")
-        ax.set_title("Verification Time vs Number of Transactions (128-bit Security)")
+        ax.set_ylabel("Verification Time (ms)")
         ax.legend(fontsize=8, ncol=2)
         _save(fig, "verification_time_exponent_line.png")
 
@@ -837,12 +854,18 @@ def generate_graphs(
                 label=f"k = {k_val}",
             )
 
+        if ecdsa_batch_rows:
+            ax.plot(
+                [int(r["tx_count"])                  for r in ecdsa_batch_rows],
+                [float(r["ecdsa_verify_energy_mj"])  for r in ecdsa_batch_rows],
+                marker="*", color=ECDSA_COLOR, linewidth=2,
+                label="ECDSA 128-bit (P-256)",
+            )
+
         ax.set_xticks(tx_ticks)
         ax.set_xticklabels([f"{x:,}" for x in tx_ticks], fontsize=9)
         ax.set_xlabel("Number of Transactions")
-        energy_src = "RAPL via pyJoules" if PYJOULES_AVAILABLE else "1 W time model"
-        ax.set_ylabel(f"Estimated Verification Energy (mJ)\n[{energy_src}]")
-        ax.set_title("Verification Energy vs Number of Transactions (128-bit Security)")
+        ax.set_ylabel("Verification Energy (mJ)")
         ax.legend(fontsize=8, ncol=2)
         _save(fig, "verification_energy_exponent_line.png")
 
